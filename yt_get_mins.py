@@ -21,7 +21,7 @@ t1 = time.time()
 
 
 # Scan for files
-fregex = 'MHD_Jet_hdf5_plt_cnt_00*'
+fregex = 'MHD_Jet_hdf5_plt_cnt_0*'
 tseries = yt.DatasetSeries(fregex, parallel=True)
 storage = {}
 
@@ -31,18 +31,18 @@ for sto, ds in tseries.piter(storage=storage):
     else:
         print 'Loading %s ...' % (ds.basename)
     alldata = ds.all_data()
-    Eintmin, Eintmax = alldata.quantities.extrema('eint')
-    Pmin, Pmax = alldata.quantities.extrema('pressure')
-    Rhomin, Rhomax = alldata.quantities.extrema('density')
+    eintmin, eintmax = alldata.quantities.extrema('eint')
+    presmin, presmax = alldata.quantities.extrema('pressure')
+    densmin, densmax = alldata.quantities.extrema('density')
 
-    sto.result = (ds.basename, ds.current_time, Eintmin, Eintmax, Pmin, Pmax, Rhomin, Rhomax)
+    sto.result = (ds.basename, ds.current_time, eintmin, eintmax, presmin, presmax, densmin, densmax)
 
 t2 = time.time()
 array = None
 
 if yt.is_root():
 
-    names = ['basename', 'time', 'Eintmin', 'Eintmax', 'Pmin', 'Pmax', 'Rhomin', 'Rhomax']
+    names = ['basename', 'time', 'eintmin', 'eintmax', 'presmin', 'presmax', 'densmin', 'densmax']
     formats = ['S25',      'f8',   'f8'     , 'f8'     , 'f8'  , 'f8'  , 'f8'    , 'f8']
     dtype = dict(names=names, formats=formats)
     array = np.array(sorted(storage.values()), dtype=dtype)
@@ -51,18 +51,18 @@ if yt.is_root():
     fig, ax0 = plt.subplots()
     lines = [None]*3
 
-    lines[0] = ax0.plot(array['time'], array['Eintmin'], '*-', color='blue', label='min eint')[0]
+    lines[0] = ax0.plot(array['time'], array['eintmin'], '*-', color='blue', label='min eint')[0]
     #ax0.set_xlabel('t')
     ax0.set_ylabel('Eint')
     ax0.semilogy()
 
     ax1 = ax0.twinx()
-    lines[1] = ax1.plot(array['time'], array['Pmin'], 'o-', color='red', label='min pressure')[0]
+    lines[1] = ax1.plot(array['time'], array['presmin'], 'o-', color='red', label='min pressure')[0]
     #ax1.set_ylabel('pressure')
     ax1.semilogy()
 
     ax2 = ax0.twinx()
-    lines[2] = ax2.plot(array['time'], array['Rhomin'], '.-', color='green', label='min density')[0]
+    lines[2] = ax2.plot(array['time'], array['densmin'], '.-', color='green', label='min density')[0]
     #ax2.set_ylabel('density')
     ax2.semilogy()
 
