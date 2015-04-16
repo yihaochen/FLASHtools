@@ -9,7 +9,8 @@ logging.getLogger().setLevel(logging.ERROR)
 import multiprocessing
 from plotSlices import plotSlices
 
-Eint_threshold = 2.0E14
+field = 'pres'
+threshold = 1.0E-13
 
 
 try:
@@ -21,18 +22,18 @@ except:
         print 'minarray.p not found. Run yt_get_mins.py first'
         raise IOError
 
-flag = array['Eintmin'] < Eint_threshold
+flag = array[field+'min'] < threshold
 toplot = array['basename'][flag]
 
 def plotfile(fn):
     try:
         ds = yt.load(fn)
         print 'Finding minimum location in %s' % fn
-        min, loc_min = ds.h.find_min('eint')
+        min, loc_min = ds.h.find_min(field)
         print 'Plotting %s' % ds.basename
         plotSlices(ds, zoom_fac=8, center=loc_min, drawnozzle=False,\
                    markcenter=True, proj_axes=['x', 'z'],\
-                   fields=['eint', 'pressure'])
+                   fields=[field, 'pressure'])
     except KeyboardInterrupt:
         print 'KeyboardInterrupt catched...'
         raise Exception
