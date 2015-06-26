@@ -14,7 +14,47 @@ def read_par(dir, parfile='flash.par'):
     return pars
 
 
-def calcNozzleCoords(pars, t, proj_axis='x'):
+def calcNozzleCoords(ds, proj_axis):
+    zvec = np.array([ds.parameters['nozzlevecx'],\
+                     ds.parameters['nozzlevecy'],\
+                     ds.parameters['nozzlevecz']])
+    rxvec = np.cross(zvec, np.array([0.,1E-10,1.]))
+    rxvec /= np.sqrt(sum(rxvec**2))
+    ryvec = np.cross(zvec, rxvec)
+
+    r = ds.parameters['nozzleradius']+ds.parameters['rfeatherout']
+    l = ds.parameters['nozzlehalfl']
+
+    nPnt = 12
+    xx = [np.cos(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
+    yy = [np.sin(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
+    nozzleCorners = np.zeros([3*nPnt,3])
+    for i in range(nPnt):
+        nozzleCorners[i,:] =        r*(xx[i]*rxvec + yy[i]*ryvec) + l*zvec
+        nozzleCorners[nPnt+i,:] =   r*(xx[i]*rxvec + yy[i]*ryvec)
+        nozzleCorners[2*nPnt+i,:] = r*(xx[i]*rxvec + yy[i]*ryvec) - l*zvec
+
+    axisDict = { 'x': 0, 'y': 1, 'z': 2 }
+    iaxis = axisDict[proj_axis]
+    sizes = nozzleCorners[:,iaxis]/(max(nozzleCorners[:,iaxis])-min(nozzleCorners[:,iaxis]))
+
+
+
+    planeDict = { 'x': (1,2), 'y': (2,0), 'z': (0,1) }
+    idim = planeDict[proj_axis]
+
+    nozzlePos = [ds.parameters['nozzleposx'],\
+                 ds.parameters['nozzleposy'],\
+                 ds.parameters['nozzleposz']]
+
+
+    nozzleCoords = [([ corner[idim[0]] + nozzlePos[idim[0]],\
+                       corner[idim[1]] + nozzlePos[idim[1]] ], size)\
+                   for corner, size in zip(nozzleCorners[sizes.argsort()], sorted(sizes)) ]
+
+    return nozzleCoords
+
+def calcNozzleCoords_from_pars(pars, t, proj_axis='x'):
     vecX = pars['nozzleVecX']
     vecY = pars['nozzleVecY']
     vecZ = pars['nozzleVecZ']
@@ -26,7 +66,10 @@ def calcNozzleCoords(pars, t, proj_axis='x'):
     # See Wikipedia "Rotation formalisms in three dimensions" for the details of the rotation.
     # http://en.wikipedia.org/wiki/Rotation_formalisms_in_three_dimensions#Rotation_matrix_.E2.86.94_Euler_axis.2Fangle
 
-    angVel = np.array([ pars['nozzleAngVelX'], pars['nozzleAngVelY'], pars['nozzleAngVelZ'] ])
+    if 'nozzleAngVelX' in pars:
+        angVel = np.array([ pars['nozzleAngVelX'], pars['nozzleAngVelY'], pars['nozzleAngVelZ'] ])
+    else:
+        angVel = np.zeros(3)
     omega = np.sqrt(sum(angVel*angVel))
 
     if omega == 0.0:
@@ -49,10 +92,10 @@ def calcNozzleCoords(pars, t, proj_axis='x'):
     ryvec = np.cross(zvec, rxvec)
     #print rxvec,ryvec,zvec
 
-    r = pars['nozzleRadius']
+    r = pars['nozzleRadius']+pars['rFeatherOut']
     l = pars['nozzleHalfL']
 
-    nPnt = 18
+    nPnt = 12
     xx = [np.cos(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
     yy = [np.sin(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
     nozzleCorners = np.zeros([3*nPnt,3])

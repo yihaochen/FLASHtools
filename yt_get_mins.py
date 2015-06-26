@@ -14,7 +14,7 @@ except:
     MPI = None
 yt.enable_parallelism()
 import logging
-logging.getLogger().setLevel(logging.ERROR)
+logging.getLogger('yt').setLevel(logging.ERROR)
 import pickle
 
 t1 = time.time()
@@ -31,18 +31,18 @@ for sto, ds in tseries.piter(storage=storage):
     else:
         print 'Loading %s ...' % (ds.basename)
     alldata = ds.all_data()
-    eintmin, eintmax = alldata.quantities.extrema('eint')
+    tempmin, tempmax = alldata.quantities.extrema('temp')
     presmin, presmax = alldata.quantities.extrema('pressure')
     densmin, densmax = alldata.quantities.extrema('density')
 
-    sto.result = (ds.basename, ds.current_time, eintmin, eintmax, presmin, presmax, densmin, densmax)
+    sto.result = (ds.basename, ds.current_time, tempmin, tempmax, presmin, presmax, densmin, densmax)
 
 t2 = time.time()
 array = None
 
 if yt.is_root():
 
-    names = ['basename', 'time', 'eintmin', 'eintmax', 'presmin', 'presmax', 'densmin', 'densmax']
+    names = ['basename', 'time', 'tempmin', 'tempmax', 'presmin', 'presmax', 'densmin', 'densmax']
     formats = ['S25',      'f8',   'f8'     , 'f8'     , 'f8'  , 'f8'  , 'f8'    , 'f8']
     dtype = dict(names=names, formats=formats)
     array = np.array(sorted(storage.values()), dtype=dtype)
@@ -51,9 +51,9 @@ if yt.is_root():
     fig, ax0 = plt.subplots()
     lines = [None]*3
 
-    lines[0] = ax0.plot(array['time'], array['eintmin'], '*-', color='blue', label='min eint')[0]
+    lines[0] = ax0.plot(array['time'], array['tempmin'], '*-', color='blue', label='min temp')[0]
     #ax0.set_xlabel('t')
-    ax0.set_ylabel('Eint')
+    ax0.set_ylabel('temp')
     ax0.semilogy()
 
     ax1 = ax0.twinx()

@@ -7,32 +7,23 @@ from tools import read_par, calcNozzleCoords
 mu = 1.67E-24
 k = 1.38E-16
 T = 1.0E7
-v = 0.1*3.0E10
-mag = 1.0E-4
+v = 2.0E31
+mag = 1.0E17
 
-Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),'temperature': (1.0E0*T, 1.0E3*T),\
+Extrema = { 'density': (1.0E-3, 1.0E-2), 'pressure':(1.0E13, 5.0E13),'temperature': (9.0E31, 2.0E32),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
             'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-v,v),\
-            #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
-            'velocity_magnitude':(1.0E3, 1.0E7),\
-            'velocity_para':(-v,v), 'velocity_perp':(-0.05*v, 0.05*v), 'mach':(0.0, 30.0),\
-            'shok': (0.0, 10.0),\
-            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-3*mag*mag, 1.0E-1*mag*mag),\
-            'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
-            'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
-            'velx': (-v,v), 'vely': (-v,v), 'velz':(-v,v),\
-            'magp': (1E-20, 1.0E-7), 'eint': (1.0E15, 1.0E18)\
-}
+            'jet ':(0.0, 1.0E22), 'ism ':(0.0, 1.0E22), 'magnetic_pressure':(1E10, 1E12)
+            }
 
 logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'velx': False, 'vely': False, 'velz': False,\
              'magx': False, 'magy': False, 'magz': False,\
              'ism ': False, 'jet ': False, 'magp': True,\
-             'eint': True, 'shok': False,\
+             'eint': True,\
              'density': True, 'pressure': True, 'temperature': True,\
              'velocity_x': False, 'velocity_y': False, 'velocity_z': False,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
-             'velocity_magnitude':True,\
              'magnetic_field_x': False, 'magnetic_field_y': False, 'magnetic_field_z': False,\
              'magnetic_pressure': True}
 
@@ -41,28 +32,25 @@ fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'je
 
 axis = {'x': 0, 'y':1, 'z':2}
 
-def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
+def plotProjectionField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
                 zoom_fac=1, nozzleCoords=None, plotgrid=True, plotvelocity=False,\
                 markcenter=False, savepath=None,\
                 show=False, annotate_particles=None, annotate_part_info=None):
-    plot = yt.SlicePlot(ds, proj_axis, field, center=center)#, width=(0.25,0.5))
-    if plotvelocity:
-        scale=10*v
-        #scale = 5.0E5
-        if type(plotvelocity) is list:
-            if field in plotvelocity:
-                plot.annotate_velocity(100, scale=scale)
-        else:
-            plot.annotate_velocity(100, scale=scale)
+    plot = yt.ProjectionPlot(ds, proj_axis, field, center=center)#, width=(0.25,0.5))
+    #if plotvelocity:
+    #    scale=10*v
+    #    if type(plotvelocity) is list:
+    #        if field in plotvelocity:
+    #            plot.annotate_velocity(100, scale=scale)
+    #    else:
+    #        plot.annotate_velocity(100, scale=scale)
     plot.set_figure_size(10.24)
     #plot.set_font({'size': 36})
     plot.set_antialias(False)
     plot.set_buff_size((2**12,2**12))
 
-    if field in ['ism ', 'jet ', 'shok']:
+    if field in ['ism ', 'jet ']:
         plot.set_cmap(field, 'gist_heat')
-    if field in ['shok']:
-        plot.set_cmap(field, 'gist_heat_r')
     if field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
                 'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp']:
         plot.set_cmap(field, 'RdBu_r')
@@ -73,8 +61,8 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     plot.annotate_timestamp(0.20, 0.95, normalized=True, format="{time:6.3f} {units}")
     if annotate_particles:
         try:
-            #slab_width = ds.domain_width.value[axis[proj_axis]] - 2.0*center[axis[proj_axis]]
-            slab_width = 1.5E20 if field in ['shok'] else 2.4E22
+            slab_width = ds.domain_width.value[axis[proj_axis]]/2**(zoom_fac-1)
+            #slab_width = 3E21
             if type(annotate_particles) is list:
                 if field in annotate_particles:
                     plot.annotate_particles(slab_width)
@@ -147,11 +135,11 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     return plot
 
 
-def plotSlices(ds, proj_axes=['x'], fields=fields_, drawnozzle=True, **kwargs):
+def plotProjections(ds, proj_axes=['x'], fields=fields_, drawnozzle=True, **kwargs):
     for proj_axis in proj_axes:
         if drawnozzle:
             nozzleCoords = calcNozzleCoords(ds, proj_axis=proj_axis)
         else:
             nozzleCoords = None
         for field in fields:
-            plotSliceField(ds, proj_axis=proj_axis, field=field, nozzleCoords=nozzleCoords, **kwargs)
+            plotProjectionField(ds, proj_axis=proj_axis, field=field, nozzleCoords=nozzleCoords, **kwargs)
