@@ -16,8 +16,9 @@ Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),'tem
             #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
             'velocity_magnitude':(1.0E3, 1.0E7),\
             'velocity_para':(-v,v), 'velocity_perp':(-0.05*v, 0.05*v), 'mach':(0.0, 30.0),\
+            'plasma_beta':(1, 1E3),\
             'shok': (0.0, 10.0),\
-            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-3*mag*mag, 1.0E-1*mag*mag),\
+            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-5*mag*mag, 1.0E-2*mag*mag),\
             'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
             'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
             'velx': (-v,v), 'vely': (-v,v), 'velz':(-v,v),\
@@ -34,7 +35,8 @@ logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
              'velocity_magnitude':True,\
              'magnetic_field_x': False, 'magnetic_field_y': False, 'magnetic_field_z': False,\
-             'magnetic_pressure': True}
+             'magnetic_pressure': True,\
+             'plasma_beta': True}
 
 fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
            'magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z', 'magnetic_pressure']
@@ -63,6 +65,8 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
         plot.set_cmap(field, 'gist_heat')
     if field in ['shok']:
         plot.set_cmap(field, 'gist_heat_r')
+    if field in ['plasma_beta']:
+        plot.set_cmap(field, 'algae_r')
     if field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
                 'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp']:
         plot.set_cmap(field, 'RdBu_r')
@@ -70,7 +74,8 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     mi, ma = Extrema[field]
     plot.set_zlim(field, mi, ma)
     plot.zoom(zoom_fac)
-    plot.annotate_timestamp(0.20, 0.95, normalized=True, format="{time:6.3f} {units}")
+    #plot.annotate_timestamp(0.20, 0.95, normalized=True, format="{time:6.3f} {units}")
+    plot.annotate_timestamp(0.20, 0.95, time_format="{time:6.3f} {units}", time_unit='Myr')
     if annotate_particles:
         try:
             #slab_width = ds.domain_width.value[axis[proj_axis]] - 2.0*center[axis[proj_axis]]
