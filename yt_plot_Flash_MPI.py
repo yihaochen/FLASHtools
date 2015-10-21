@@ -54,6 +54,7 @@ fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet
 #fields = ['magnetic_pressure']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z']
 #fields = ['pressure']
+#fields = ['magnetic_field_z']
 #fields = ['velocity_y']
 #fields = ['shok']
 #fields = ['plasma_beta']
