@@ -6,13 +6,10 @@ yt.enable_parallelism()
 import logging
 logging.getLogger('yt').setLevel(logging.INFO)
 
-
 #nu = yt.YTQuantity(500, 'MHz')
 
-dir = '/home/ychen/d9/FLASH4/stampede/1022_L45_M10_b1_h1_10Myr/'
-#fname = '/home/ychen/d9/FLASH4/stampede/0529_L45_M10_b1_h1/MHD_Jet_hdf5_plt_cnt_0320'
-#ds = yt.load(fname, particle_filename=fname.replace('plt_cnt', 'part'))
-ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_*50'), parallel=4)
+dir = '/home/ychen/d9/FLASH4/stampede/0529_L45_M10_b1_h1/'
+ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_*00'), parallel=7)
 
 figuredir = os.path.join(dir, 'synchrotron')
 if yt.is_root():
@@ -20,27 +17,41 @@ if yt.is_root():
         os.mkdir(os.path.join(dir, figuredir))
 
 for ds in ts.piter():
-    for nu in [yt.YTQuantity(150, 'MHz'), yt.YTQuantity(1.4, 'GHz')]:
-        add_emissivity(ds, nu=nu)
+    #proj_axis = 'x'
+    #proj = yt.ProjectionPlot(ds, proj_axis, ('gas', 'density'), center=(0,0,0))
+    ##proj.set_zlim(('gas', 'density'), 1E-5, 1E-2)
+    ##proj.set_cmap(('flash', 'jet '), 'gist_heat')
+    #proj.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}", time_unit='Myr', draw_inset_box=True)
+    #proj.annotate_text((0.85, 0.95), dir.split('b1_')[-1].strip('/'), coord_system='axis', text_args={'color':'k'})
+    #proj.zoom(10)
+    #savefn = 'Projection_%s_density_%s.png' % (proj_axis, str(ds).split('_')[-1])
+    #proj.save(os.path.join(figuredir,savefn))
 
-        #field = 'avgfill_emissivity'
-        #slice = yt.SlicePlot(ds, 'x', ('deposit', field), center=(0,0,0),
+    for nu in [(150, 'MHz'), (1.4, 'GHz')]:
+        norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
+        pars = add_emissivity(ds, nu=nu)
+        #print pars
+
+        #field = pars[2]
+        #proj_axis = 'x'
+        #slice = yt.SlicePlot(ds, proj_axis, ('deposit', field), center=(0,0,0),
         #                        field_parameters={'frequency': nu})
-        #slice.set_zlim(('deposit', field), 1E-36/nu.in_units('GHz').value**0.5,
-        #                   1E-32/nu.in_units('GHz').value**0.5)
+        #slice.set_zlim(field, 1E-36/norm, 1E-32/norm)
+        #slice.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}", time_unit='Myr', draw_inset_box=True)
+        #slice.annotate_text((0.85, 0.95), dir.split('b1_')[-1].strip('/'), coord_system='axis', text_args={'color':'k'})
         #slice.annotate_grids()
         #slice.zoom(10)
-        #slice.save('Slice_emissivty_%s.png' % nu)
+        #savefn = 'Slice_%s_emissivity_%s_%s.png' % (proj_axis, str(nu).replace(' ',''), str(ds).split('_')[-1])
+        #slice.save(os.path.join(figuredir,savefn))
 
-        field = 'avgfill_intensity'
+        field = pars[4]
         proj_axis = 'x'
-        proj = yt.ProjectionPlot(ds, proj_axis, ('deposit', field), center=(0,0,0),
+        proj = yt.ProjectionPlot(ds, proj_axis, field, center=(0,0,0),
                                         field_parameters={'frequency': nu})
-        proj.set_zlim(('deposit', field), 1E-3/nu.in_units('GHz').value**0.5, 
-                              1E1/nu.in_units('GHz').value**0.5)
+        proj.set_zlim(field, 1E-3/norm, 1E1/norm)
         proj.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}", time_unit='Myr', draw_inset_box=True)
         proj.annotate_text((0.85, 0.95), dir.split('b1_')[-1].strip('/'), coord_system='axis', text_args={'color':'k'})
         proj.zoom(10)
-        #proj.save(dir+'Synchrotron/')
-        savefn = 'Projection_%s_intensity_%s_%s.png' % (proj_axis, str(nu).replace(' ',''), str(ds).split('_')[-1])
-        proj.save(os.path.join(figuredir,savefn))
+        proj.save(figuredir)
+        #savefn = 'Projection_%s_%s_%s_%s.png' % (proj_axis, field, str(nu).replace(' ',''), str(ds).split('_')[-1])
+        #proj.save(os.path.join(figuredir,savefn))
