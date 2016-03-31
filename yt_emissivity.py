@@ -34,6 +34,8 @@ def _jet_volume_fraction(field, data):
     gammaICM= data.ds.parameters['sim_gammaicm']
     mu      = data.ds.parameters['sim_mu']
 
+    if not isinstance(data, FieldDetector):
+        data.set_field_parameter('center', (0,0,0))
     r = data['index', 'spherical_radius']
 
     density0 = rhoCore*(1.0 + (r/rCore)**2)**(-1.5*densitybeta)
@@ -91,8 +93,8 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
               /yt.YTQuantity(4.*np.pi, 'sr')
         frac = grid['gas', 'jet_volume_fraction']
         uq = PB.uq*grid[ptype, deposit_field].uq
-        if isinstance(grid, FieldDetector): return grid[ptype, deposit_field]*PB*frac
-        if len(grid[ptype, deposit_field]) > 0: return PB*frac*grid[ptype, deposit_field].mean()
+        if isinstance(grid, FieldDetector): return grid[ptype, deposit_field]*PB
+        if len(grid[ptype, deposit_field]) > 0: return PB*grid[ptype, deposit_field].mean()
         elif grid.Level == 0: return grid['zeros']*uq
         else:
             pfield = yt.YTArray([0], input_units=grid[ptype, deposit_field].units)
@@ -101,14 +103,14 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
             if len(pfield) == 0:
                 return grid['zeros']*uq
             else:
-                return PB*frac*pfield.mean()*grid[ptype, deposit_field].uq
+                return PB*pfield.mean()*grid[ptype, deposit_field].uq
 
     fname2 =('deposit', 'avgfill_emissivity_%s' % nu_str)
     ds.add_field(fname2, function=_deposit_average_filling,
                  validators=[ValidateGridType()],
                  display_name="%s Emissivity" % nu,
-                 units='Jy/cm/arcsec**2',
-                 take_log=True, force_override=True)
+                 units='Jy/cm/arcsec**2', take_log=True,
+                 force_override=True)
 
     ###########################################################################
     ## Nearest Neighbor method
@@ -134,5 +136,46 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
                  units='Jy/cm/arcsec**2', take_log=True,
                  force_override=True)
 
-    return pfilter, fname1, fname2, fname3, fname4, nu_str
+    ###########################################################################
+    ## Particle filter method
+    ###########################################################################
+
+    def _deposit_avg_pfilter(field, grid):
+        ptype = 'jetp'
+        p = grid.ds.all_data()[ptype, 'particle_position']
+        deposit_field = fname1[1]
+        pfield = grid.ds.all_data()[ptype, deposit_field]
+        PB =  grid['gas', 'pressure']\
+              *grid['gas', 'magnetic_field_strength']**1.5\
+              /yt.YTQuantity(4.*np.pi, 'sr')
+        if isinstance(grid, FieldDetector): return grid[ptype, deposit_field]*PB
+        l = grid.LeftEdge
+        r = grid.RightEdge
+        c = (l+r)/2.
+        filter = (p[:,0]>l[0])*(p[:,0]<r[0])
+        for i in range(1,3):
+            filter *= (p[:,i]>l[i])*(p[:,i]<r[i])
+        #reg = grid.ds.region(c, c+(l-c)*fac, c+(r-c)*fac)
+        expand = 0
+        while len(pfield[filter]) == 0 and expand < 3:
+            if grid.Level == 0: return grid['zeros']*PB.uq*grid[ptype, deposit_field].uq
+            expand += 1
+            l = c+(l-c)*2.
+            r = c+(r-c)*2.
+            filter = (p[:,0]>l[0])*(p[:,0]<r[0])
+            for i in range(1,3):
+                filter *= (p[:,i]>l[i])*(p[:,i]<r[i])
+            #reg = grid.ds.region(c, c+(l-c)*fac, c+(r-c)*fac)
+        return PB*pfield[filter].mean()
+
+    fname5 = ('deposit', 'avgpf_emissivity_%s' %nu_str)
+    ds.add_field(fname5, function=_deposit_avg_pfilter,
+                 validators=[ValidateGridType()],
+                 display_name='%s Avg (pfilter) Emissivity' % nu,
+                 units='Jy/cm/arcsec**2', take_log=True,
+                 force_override=True)
+
+
+
+    return pfilter, fname1, fname2, fname3, fname4, fname5, nu_str
 
