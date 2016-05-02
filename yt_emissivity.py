@@ -3,25 +3,29 @@ import yt
 from yt.data_objects.particle_filters import add_particle_filter
 from yt.fields.derived_field import ValidateGridType
 from yt.fields.field_detector import FieldDetector
+from tools import calcDen0
+from functools import partial
 
 def _jetp(pfilter, data):
     #filter = data[("all", "particle_shok")] == 0
-    filter = np.logical_and((data[("io", "particle_shok")] == 0), 
+    den0 = calcDen0(data['all', 'particle_tadd'])
+    jetfil = np.logical_and((data[("io", "particle_shok")] == 0), 
                             (data[("io", "particle_gamc")] > 0.0))
+    corefil = np.logical_and((data['all', 'particle_den0']>den0-3E-30),\
+                            (data['all', 'particle_den0']<den0+3E-30))
+    filter = np.logical_and(jetfil, corefil)
+    return filter
+
+def _shok(pfilter, data):
+    #filter = data[("all", "particle_shok")] == 0
+    shokfil = (data[("io", "particle_shok")] == 1)
+    gamcfil = np.logical_and((data[("io", "particle_gamc")] > 0.0),\
+                             (data[("io", "particle_gamc")] < 1E40))
+    filter = np.logical_and(shokfil, gamcfil)
     return filter
 
 add_particle_filter("jetp", function=_jetp, filtered_type='io', requires=["particle_shok"])
-
-me = yt.utilities.physical_constants.mass_electron #9.109E-28
-c  = yt.utilities.physical_constants.speed_of_light #2.998E10
-e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
-mp = yt.utilities.physical_constants.mass_hydrogen
-k  = yt.utilities.physical_constants.boltzmann_constant
-g = yt.YTQuantity(1.0, 'g')
-cm = yt.YTQuantity(1.0, 'cm')
-Kelvin = yt.YTQuantity(1.0, 'K')
-
-gamma_min = yt.YTQuantity(10, 'dimensionless')
+add_particle_filter("shok", function=_shok, filtered_type='io', requires=["particle_shok"])
 
 
 def _jet_volume_fraction(field, data):
@@ -53,6 +57,17 @@ def _jet_volume_fraction(field, data):
 
 
 def add_emissivity(ds, nu=(1.4, 'GHz')):
+    me = yt.utilities.physical_constants.mass_electron #9.109E-28
+    c  = yt.utilities.physical_constants.speed_of_light #2.998E10
+    e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
+    mp = yt.utilities.physical_constants.mass_hydrogen
+    k  = yt.utilities.physical_constants.boltzmann_constant
+    g = yt.YTQuantity(1.0, 'g')
+    cm = yt.YTQuantity(1.0, 'cm')
+    Kelvin = yt.YTQuantity(1.0, 'K')
+
+    gamma_min = yt.YTQuantity(10, 'dimensionless')
+
     nu = yt.YTQuantity(*nu)
     nu_str = str(nu).replace(' ', '')
     if ('gas', 'jet_volume_fraction') not in ds.derived_field_list:
@@ -78,8 +93,8 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
     fname1 =('io', 'particle_sync_spec_%s' % nu_str)
     ds.add_field(fname1, function=_synchrotron_spec, particle_type=True,
                  units='cm**(3/4)*s**(3/2)/g**(3/4)', force_override=True)
-
     pfilter = ds.add_particle_filter('jetp')
+    sfilter = ds.add_particle_filter('shok')
 
     ###########################################################################
     ## Average Filling method
@@ -115,10 +130,12 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
     ###########################################################################
     ## Nearest Neighbor method
     ###########################################################################
-    fname3 = ds.add_deposited_particle_field(
+    fname3p = ds.add_deposited_particle_field(
             ('jetp', 'particle_sync_spec_%s' % nu_str), 'nearest')
+    fname3s = ds.add_deposited_particle_field(
+            ('shok', 'particle_sync_spec_%s' % nu_str), 'nearest')
 
-    def _nn_emissivity(field, data):
+    def _nn_emissivity_jetp(field, data):
         '''
         Emissivity using nearest neighbor. Integrate over line of sight to get intensity.
         '''
@@ -128,11 +145,28 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
         frac = data['gas', 'jet_volume_fraction']
         return PB*frac*data['deposit', 'jetp_nn_sync_spec_%s' % nu_str]
 
+    def _nn_emissivity_shok(field, data):
+        '''
+        Emissivity using nearest neighbor. Integrate over line of sight to get intensity.
+        '''
+        PB =  data['gas', 'pressure']\
+              *data['gas', 'magnetic_field_strength']**1.5\
+              /yt.YTQuantity(4.*np.pi, 'sr')
+        frac = data['gas', 'jet_volume_fraction']
+        return PB*frac*data['deposit', 'shok_nn_sync_spec_%s' % nu_str]
+
+
     #print ds.field_info[('jetp', 'particle_emissivity')].units
     #print ds.field_info[f4].units
-    fname4 = ('deposit', 'nn_emissivity_%s' % nu_str)
-    ds.add_field(fname4, function=_nn_emissivity,
+    fname4p = ('deposit', 'nn_emissivity_jetp_%s' % nu_str)
+    ds.add_field(fname4p, function=_nn_emissivity_jetp,
                  display_name='%s NN Emissivity' % nu,
+                 units='Jy/cm/arcsec**2', take_log=True,
+                 force_override=True)
+
+    fname4s = ('deposit', 'nn_emissivity_shok_%s' % nu_str)
+    ds.add_field(fname4s, function=_nn_emissivity_shok,
+                 display_name='%s NN Emissivity (Shok)' % nu,
                  units='Jy/cm/arcsec**2', take_log=True,
                  force_override=True)
 
@@ -177,5 +211,5 @@ def add_emissivity(ds, nu=(1.4, 'GHz')):
 
 
 
-    return pfilter, fname1, fname2, fname3, fname4, fname5, nu_str
+    return pfilter, fname1, fname2, fname3p, fname3s, fname4p, fname4s, fname5, nu_str
 
