@@ -146,3 +146,9 @@ def calcNozzleCoords_from_pars(pars, t, proj_axis='x'):
     #    print coord
 
     return nozzleCoords
+
+def calcDen0(tadd, t1=1.58E13, v=3E9, g=1.33333, r=7.5E20, bf=1.875E20, initM=5, mach=10):
+    M = initM+(mach-initM)*np.cos(0.5*np.pi*np.clip((tadd-t1)/t1, -1.0, 0.0))
+    den0 = 0.5*1E45/np.pi/v**3/( 0.5*r*r*(1.+1./M**2/(g-1.)) + r*bf*(0.3125+1./M**2/(g-1.))\
+                             + bf*bf*(0.06056+0.29736/M**2/(g-1.)) )
+    return den0
