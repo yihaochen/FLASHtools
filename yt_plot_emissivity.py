@@ -14,14 +14,18 @@ logging.getLogger('yt').setLevel(logging.INFO)
 dir = '/home/ychen/d9/FLASH4/stampede/0529_L45_M10_b1_h1/'
 #dir = '/home/ychen/data/0only_1022_h1_10Myr/'
 #dir = '/d/d8/ychen/MHD_Jet/0314_L45_M10_b1_h1_nojiggle'
-ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0[2-5][0,2,4,6,8]0'), parallel=20)
+ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0[2-9][0,2,4,6,8]0'), parallel=40)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0600'), parallel=8)
 
-figuredir = os.path.join(dir, 'synchrotron_nn_shok/')
+ptype = 'lnsp'
+maindir = os.path.join(dir, 'synchrotron_nn_%s_core05/' % ptype)
+figuredir = os.path.join(maindir, 'emissivity')
+spectral_index_dir = os.path.join(maindir, 'spectral_index')
 if yt.is_root():
-    if not os.path.exists(os.path.join(dir,figuredir)):
-        os.mkdir(os.path.join(dir, figuredir))
+    for subdir in [maindir, figuredir, spectral_index_dir]:
+        if not os.path.exists(subdir):
+            os.mkdir(subdir)
 
 for ds in ts.piter():
     #proj = yt.ProjectionPlot(ds, proj_axis, ('gas', 'density'), center=(0,0,0))
@@ -34,11 +38,10 @@ for ds in ts.piter():
     #proj.save(os.path.join(figuredir,savefn))
 
     projs = {}
-    proj_axis = 'y'
+    proj_axis = 'x'
     for nu in [(150, 'MHz'), (1.4, 'GHz')]:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
-        ptype = 'shok'
-        pars = add_emissivity(ds, nu=nu)
+        pars = add_emissivity(ds, ptype=ptype, nu=nu)
         field = ('deposit', ('nn_emissivity_%s_%%.1f%%s' % ptype) % nu)
         #field = ('deposit', 'jetp_nn_sync_spec_%.1f%s' % nu)
         #field = [('deposit', 'avgfill_emissivity_%.1f%s' % nu),\
@@ -81,37 +84,42 @@ for ds in ts.piter():
         ##plot.annotate_grids()
         plot.zoom(10)
         plot.save(figuredir)
+        projs[nu] = plot.data_source
 
-    #if yt.is_root():
+    if yt.is_root():
         #pickle.dump(projs, open(dir+'projs/%s_projs.pickle' % ds.basename, 'wb'))
         #projs[(1.4, 'GHz')].save_object('proj_1.4GHz', dir+'projs/'+ds.basename+'_projs.cpkl')
         #projs[(150, 'MHz')].save_object('proj_150MHz', dir+'projs/'+ds.basename+'_projs.cpkl')
 
-        #ext = ds.arr([-1.544E23, 1.544E23, -7.72E22, 7.72E22], input_units='code_length')
-        #frb1 = projs[(1.4, 'GHz')].to_frb(ext[1]-ext[0], (1024,512), height=(ext[3]-ext[2]))
-        #frb2 = projs[(150, 'MHz')].to_frb(ext[1]-ext[0], (1024,512), height=(ext[3]-ext[2]))
-        #S1 = frb1[('deposit', 'nn_emissivity_1.4GHz')]
-        #S2 = frb2[('deposit', 'nn_emissivity_150.0MHz')]
-        #alpha = np.log(S1/S2)/np.log(1400/150)
+        ext = ds.arr([-7.72E22, 7.72E22, -1.544E23, 1.544E23], input_units='code_length')
+        frb1 = projs[(1.4, 'GHz')].to_frb(ext[1]-ext[0], (512,1024), height=(ext[3]-ext[2]))
+        frb2 = projs[(150, 'MHz')].to_frb(ext[1]-ext[0], (512,1024), height=(ext[3]-ext[2]))
+        S1 = frb1[('deposit', 'nn_emissivity_%s_1.4GHz' % ptype)]
+        S2 = frb2[('deposit', 'nn_emissivity_%s_150.0MHz' % ptype)]
+        alpha = np.log(S1/S2)/np.log(1400/150)
+        alpha = np.ma.masked_where(S1<0.001, np.array(alpha))
 
-        #fig = plt.figure(figsize=(12,6), dpi=150)
-        #ims = plt.imshow(np.array(alpha), vmin=-2, vmax=-0.5, extent=ext.in_units('kpc'), origin='lower', aspect='equal')
-        #plt.xlabel('z (kpc)')
-        #plt.ylabel('x (kpc)')
-        #cb = plt.colorbar()
-        #cb.set_label('Spectral Index (1.4GHz/150MHz)')
+        fig = plt.figure(figsize=(8,12), dpi=150)
+        ims = plt.imshow(alpha, vmin=-2, vmax=-0.5, extent=ext.in_units('kpc'), origin='lower', aspect='equal')
+        plt.xlabel('z (kpc)')
+        plt.ylabel('x (kpc)')
+        cb = plt.colorbar()
+        cb.set_label('Spectral Index (%s) (1.4GHz/150MHz)' % ptype)
 
-        #dirnamesplit = dir.split('_')
-        #if dirnamesplit[-1] in ['h1','hinf', 'h0']:
-        #    sim_name = dirnamesplit[-1]
-        #else:
-        #    sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
-        #x = 0.80
-        #plt.annotate(sim_name, (1,1), xytext=(x, 0.96),  textcoords='axes fraction',\
-        #            horizontalalignment='left', verticalalignment='center')
+        dirnamesplit = dir.split('_')
+        if dirnamesplit[-1] in ['h1','hinf', 'h0']:
+            sim_name = dirnamesplit[-1]
+        else:
+            sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
+        x = 0.80
+        plt.annotate(sim_name, (1,1), xytext=(x, 0.96),  textcoords='axes fraction',\
+                    horizontalalignment='left', verticalalignment='center')
 
-        #plt.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
-        #            (0,1), xytext=(0.05, 0.96),  textcoords='axes fraction',\
-        #            horizontalalignment='left', verticalalignment='center')
-        #plt.tight_layout()
-        #plt.savefig(dir+'spectral_index/%s_proj_spectral_index.png' % ds.basename)
+        plt.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
+                    (0,1), xytext=(0.05, 0.96),  textcoords='axes fraction',\
+                    horizontalalignment='left', verticalalignment='center')
+        plt.tight_layout()
+        plt.savefig(spectral_index_dir+'/%s_proj_spectral_index.png' % ds.basename)
+
+    # Done with this dataset
+    del projs
