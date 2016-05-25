@@ -4,22 +4,23 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import yt
-from yt_emissivity import *
+from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
 import logging
 logging.getLogger('yt').setLevel(logging.INFO)
 
 #nu = yt.YTQuantity(500, 'MHz')
 
-dir = '/home/ychen/d9/FLASH4/stampede/0529_L45_M10_b1_h1/'
+
+#dir = '/home/ychen/d9/FLASH4/stampede/0529_L45_M10_b1_h1/'
 #dir = '/home/ychen/data/0only_1022_h1_10Myr/'
 #dir = '/d/d8/ychen/MHD_Jet/0314_L45_M10_b1_h1_nojiggle'
-ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0[2-9][0,2,4,6,8]0'), parallel=40)
+ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0[0-2]?0'), parallel=15)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0600'), parallel=8)
 
-ptype = 'lnsp'
-maindir = os.path.join(dir, 'synchrotron_nn_%s_core05/' % ptype)
+ptype = 'lobe'
+maindir = os.path.join(dir, 'synchrotron_nn_%s/' % ptype)
 figuredir = os.path.join(maindir, 'emissivity')
 spectral_index_dir = os.path.join(maindir, 'spectral_index')
 if yt.is_root():
@@ -38,10 +39,10 @@ for ds in ts.piter():
     #proj.save(os.path.join(figuredir,savefn))
 
     projs = {}
-    proj_axis = 'x'
+    proj_axis = 'y'
     for nu in [(150, 'MHz'), (1.4, 'GHz')]:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
-        pars = add_emissivity(ds, ptype=ptype, nu=nu)
+        pars = add_synchrotron_emissivity(ds, ptype=ptype, nu=nu)
         field = ('deposit', ('nn_emissivity_%s_%%.1f%%s' % ptype) % nu)
         #field = ('deposit', 'jetp_nn_sync_spec_%.1f%s' % nu)
         #field = [('deposit', 'avgfill_emissivity_%.1f%s' % nu),\

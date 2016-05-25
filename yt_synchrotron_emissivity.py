@@ -107,7 +107,7 @@ def _jet_volume_fraction(field, data):
     return 1.0 - icm_volume_fraction
 
 
-def add_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='nearest'):
+def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='nearest'):
     me = yt.utilities.physical_constants.mass_electron #9.109E-28
     c  = yt.utilities.physical_constants.speed_of_light #2.998E10
     e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
