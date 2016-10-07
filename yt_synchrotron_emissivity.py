@@ -138,7 +138,7 @@ def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='neares
         return N0*norm*fit_const*nu**(-0.5)*np.exp(-nu/nuc)
 
     fname1 =('io', 'particle_sync_spec_%s' % nu_str)
-    ds.add_field(fname1, function=_synchrotron_spec, particle_type=True,
+    ds.add_field(fname1, function=_synchrotron_spec, sampling_type='particle',
                  units='cm**(3/4)*s**(3/2)/g**(3/4)', force_override=True)
     ds.add_particle_filter('jetp')
     ds.add_particle_filter('shok')
@@ -247,4 +247,158 @@ def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='neares
 
 
     return fname1, fname2, fname3, fname4, fname5, nu_str
+
+
+def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='nearest', proj_axis='x'):
+    me = yt.utilities.physical_constants.mass_electron #9.109E-28
+    c  = yt.utilities.physical_constants.speed_of_light #2.998E10
+    e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
+
+    gamma_min = yt.YTQuantity(10, 'dimensionless')
+
+    # fitted constants for the approximated power-law + exponential spectra
+    fit_const_perp = 5
+    fit_const_para = 0.5
+    tot_const = fit_const_perp + fit_const_para
+    pol_ratio = (fit_const_para - fit_const_perp)/tot_const
+
+
+    nu = yt.YTQuantity(*nu)
+    nu_str = str(nu).replace(' ', '')
+
+    if proj_axis=='x':
+        los = [1.,0.,0.]
+        xvec = [0., 1., 0.]
+        yvec = [0., 0., 1.]
+    elif proj_axis=='y':
+        los = [0.,1.,0.]
+        xvec = [0., 0., 1.]
+        yvec = [1., 0., 0.]
+    elif proj_axis=='z':
+        los = [0.,0.,1.]
+        xvec = [1., 0., 0.]
+        yvec = [0., 1., 0.]
+    elif proj_axis is list: los = proj_axis
+    else: raise IOError
+    los = np.array(los)
+    xvec = np.array(xvec)
+    yvec = np.array(yvec)
+    los = los/np.sqrt(np.sum(los*los))
+
+    fnames = []
+    if ('gas', 'jet_volume_fraction') not in ds.derived_field_list:
+        ds.add_field(('gas', 'jet_volume_fraction'), function=_jet_volume_fraction,
+                     display_name="Jet Volume Fraction")
+
+    def _synchrotron_spec(field, data):
+        ptype = 'io'
+        # To convert from FLASH "none" unit to cgs unit, times the B field from FLASH by sqrt(4*pi)
+        #B = np.sqrt(data[(ptype, 'particle_magx')]**2
+        #           +data[(ptype, 'particle_magy')]**2
+        #           +data[(ptype, 'particle_magz')]**2)*np.sqrt(4.0*np.pi)
+        #B = data.apply_units(B, 'gauss')
+        Bvec = np.array([data[(ptype, 'particle_magx')],\
+                         data[(ptype, 'particle_magy')],\
+                         data[(ptype, 'particle_magz')]])*np.sqrt(4.0*np.pi)
+        Bvec = data.apply_units(Bvec, 'gauss')
+        #B = np.sqrt(np.sum(Bvec*Bvec, axis=0))
+
+        cross = np.cross(los, Bvec, axisb=0)
+        Bsina = np.sqrt(np.sum(cross*cross, axis=-1))
+        Bsina = data.apply_units(Bsina, 'gauss')
+
+        # Cutoff frequency
+        nuc = 3.0*data[(ptype, 'particle_gamc')]**2*e*Bsina/(4.0*np.pi*me*c)
+        #nu = data.get_field_parameter("frequency", default=yt.YTQuantity(1.4, 'GHz'))
+
+        # B**1.5 is taken from the grid data
+        norm = 0.5*e**3.5/(c**2.5*me**1.5*(4.*np.pi)**0.5)
+        # P is taken from the grid data
+        N0 = 3.0/me/c/c/(np.log(np.abs(data[(ptype, 'particle_gamc')]/gamma_min)))
+
+        return N0*norm*nu**(-0.5)*np.exp(-nu/nuc)
+
+    fname1 =('io', 'particle_sync_spec_%s' % nu_str)
+    ds.add_field(fname1, function=_synchrotron_spec, sampling_type='particle',
+                 units='cm**(3/4)*s**(3/2)/g**(3/4)', force_override=True)
+    ds.add_particle_filter('jetp')
+    ds.add_particle_filter('shok')
+    ds.add_particle_filter('jnsp')
+    ds.add_particle_filter('lobe')
+    ds.add_particle_filter('lnsp')
+    #import pdb; pdb.set_trace()
+
+    ###########################################################################
+    ## Nearest Neighbor method
+    ###########################################################################
+    fname2 = ds.add_deposited_particle_field(
+            (ptype, 'particle_sync_spec_%s' % nu_str), 'nearest')
+
+    def _nn_emissivity_i(field, data):
+        '''
+        Emissivity using nearest neighbor. Integrate over line of sight to get intensity.
+        '''
+        Bvec = np.array([data[('gas', 'magnetic_field_x')],\
+                         data[('gas', 'magnetic_field_y')],\
+                         data[('gas', 'magnetic_field_z')]])
+        cross = np.cross(los, Bvec, axisb=0)
+        # B * sin(alpha) = (B * |(los x Bvec)|/|los|/|Bvec|)
+        # = |(los x Bvec)|
+        Bsina = np.sqrt(np.sum(cross*cross, axis=-1))
+        Bsina = data.apply_units(Bsina, 'gauss')
+
+        # P * B^1.5 /4pi
+        PBsina = data['gas', 'pressure']*Bsina**1.5\
+                 /yt.YTQuantity(4.*np.pi, 'sr')
+                 #*data['gas', 'magnetic_field_strength']**1.5\
+        frac = data['gas', 'jet_volume_fraction']
+
+        return PBsina*frac*tot_const*data['deposit', '%s_nn_sync_spec_%s' % (ptype, nu_str)]
+
+
+    #print ds.field_info[('jetp', 'particle_emissivity')].units
+    #print ds.field_info[f4].units
+
+    fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
+    ds.add_field(fname_nn_emis, function=_nn_emissivity_i,
+                 display_name='%s NN Emissivity I (%s)' % (nu_str, ptype),
+                 units='Jy/cm/arcsec**2', take_log=True,
+                 force_override=True)
+
+    def _nn_emissivity_q(field, data):
+        Bvec = np.stack([data[('gas', 'magnetic_field_x')],\
+                         data[('gas', 'magnetic_field_y')],\
+                         data[('gas', 'magnetic_field_z')]], axis=-1)
+        Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        cos[np.isnan(cos)] = 0.0
+        #import pdb; pdb.set_trace()
+        fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
+        return data[fname_nn_emis]*pol_ratio*(2*cos*cos-1.0)
+
+    fname_nn_emis_h = ('deposit', 'nn_emissivity_q_%s_%s' % (ptype, nu_str))
+    ds.add_field(fname_nn_emis_h, function=_nn_emissivity_q,
+                 display_name='%s NN Emissivity Q (%s)' % (nu_str, ptype),
+                 units='Jy/cm/arcsec**2', take_log=False,
+                 force_override=True)
+
+    def _nn_emissivity_u(field, data):
+        Bvec = np.stack([data[('gas', 'magnetic_field_x')],\
+                         data[('gas', 'magnetic_field_y')],\
+                         data[('gas', 'magnetic_field_z')]], axis=-1)
+        Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        sin = np.sqrt(1.0-cos*cos)
+        cos[np.isnan(cos)] = 0.0
+        sin[np.isnan(sin)] = 0.0
+        fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
+        return data[fname_nn_emis]*pol_ratio*2*sin*cos
+
+    fname_nn_emis_v = ('deposit', 'nn_emissivity_u_%s_%s' % (ptype, nu_str))
+    ds.add_field(fname_nn_emis_v, function=_nn_emissivity_u,
+                 display_name='%s NN Emissivity U (%s)' % (nu_str, ptype),
+                 units='Jy/cm/arcsec**2', take_log=False,
+                 force_override=True)
+
+    return fname1, fname2, fname_nn_emis, nu_str
 
