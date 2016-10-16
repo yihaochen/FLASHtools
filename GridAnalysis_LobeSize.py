@@ -3,6 +3,7 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import numpy as np
+import os.path as op
 import util
 import yt
 import MPI_taskpull2
@@ -44,7 +45,21 @@ def worker_fn(dirname, filepath):
         if jet > 1E-6:
             zmin = z
             break
-    return int(ds.basename[-4:]), ds.current_time.in_units('Myr'), zmax.in_units('kpc'), zmin.in_units('kpc')
+
+    kpc = yt.units.kpc.in_units('cm')
+    leftedge = [-30*kpc, -30*kpc, 0.0]
+    rightedge = [ 30*kpc, 30*kpc, zmax.in_units('cm')*1.2]
+    upbox = ds.box(leftedge, rightedge)
+    upcenter = np.sum(upbox['jet ']*upbox['cell_mass']*upbox['z'])/np.sum(upbox['jet ']*upbox['cell_mass'])
+
+
+    leftedge = [-30*kpc, -30*kpc, zmin.in_units('cm')*1.2]
+    rightedge = [ 30*kpc, 30*kpc, 0.0]
+    bottombox = ds.box(leftedge, rightedge)
+    bottomcenter = np.sum(bottombox['jet ']*bottombox['cell_mass']*bottombox['z'])/np.sum(bottombox['jet ']*bottombox['cell_mass'])
+
+    return int(ds.basename[-4:]), ds.current_time.in_units('Myr'), zmax.in_units('kpc'), zmin.in_units('kpc'), \
+           upcenter.in_units('kpc'), bottomcenter.in_units('kpc')
 
 def tasks_gen(dirs):
     for dir in dirs:
@@ -60,6 +75,8 @@ if results:
     collected = {}
     for key, item in results.items():
         dirname, fname = key
+        if 'restart' in dirname:
+            dirname = op.dirname(dirname) + '/'
         if dirname in collected:
             collected[dirname].append(item)
         else:
@@ -71,11 +88,11 @@ if results:
     #picklename = time.strftime("Bflux_table_%Y%m%d_%H%M%S.pickle")
     #pickle.dump(collected, open( picklename, "wb" ))
 
-    fmt = '%04d  %6.3f %6.3f %6.3f'
-    header = 'file t(Myr) zEdge(kpc)'
+    fmt = '%04d  %6.3f %6.3f %6.3f %6.3f %6.3f'
+    header = 'filenumber, t(Myr), zEdge+(kpc), zEdge-(kpc), zCenter+(kpc), zCenter-(kpc), '
     for dirname in collected.keys():
         #print np.asarray(collected[dirname])
-        np.savetxt(dirname+'/lobe_edges.txt', np.asarray(collected[dirname]), fmt=fmt, header=header)
+        np.savetxt(dirname+'/GridAnalysis_LobeSize.txt', np.asarray(collected[dirname]), fmt=fmt, header=header)
 
 #if MPI_taskpull2.rank == 0:
 #    for key, item in results.items():
