@@ -131,8 +131,8 @@ def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='neares
         # Cutoff frequency
         nuc = 3.0*data[(ptype, 'particle_gamc')]**2*e*B/(4.0*np.pi*me*c)
         #nu = data.get_field_parameter("frequency", default=yt.YTQuantity(1.4, 'GHz'))
-        fit_const = 5.8
-        norm = 0.5*e**3.5/(c**2.5*me**1.5*(4.*np.pi)**0.5)
+        fit_const = 4.1648
+        norm = 3.0/8.0*e**3.5/(c**2.5*me**1.5*(np.pi)**0.5)
         N0 = 3.0/me/c/c/(np.log(np.abs(data[(ptype, 'particle_gamc')]/gamma_min)))
 
         return N0*norm*fit_const*nu**(-0.5)*np.exp(-nu/nuc)
@@ -255,12 +255,12 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
 
     gamma_min = yt.YTQuantity(10, 'dimensionless')
-
-    # fitted constants for the approximated power-law + exponential spectra
-    fit_const_perp = 5
-    fit_const_para = 0.5
-    tot_const = fit_const_perp + fit_const_para
-    pol_ratio = (fit_const_para - fit_const_perp)/tot_const
+    # Index for electron power law distribution
+    p = 2
+    pol_ratio = (p+1.)/(p+7./3.)
+    # Fitted constants for the approximated power-law + exponential spectra
+    # Integral of 2*F(x) -> tot_const*nu**-2*exp(-nu/nuc)
+    tot_const = 4.1648
 
 
     nu = yt.YTQuantity(*nu)
@@ -312,7 +312,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
         #nu = data.get_field_parameter("frequency", default=yt.YTQuantity(1.4, 'GHz'))
 
         # B**1.5 is taken from the grid data
-        norm = 0.5*e**3.5/(c**2.5*me**1.5*(4.*np.pi)**0.5)
+        norm = 3.0/8.0*e**3.5/(c**2.5*me**1.5*(np.pi)**0.5)
         # P is taken from the grid data
         N0 = 3.0/me/c/c/(np.log(np.abs(data[(ptype, 'particle_gamc')]/gamma_min)))
 
