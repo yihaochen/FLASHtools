@@ -256,10 +256,10 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
 
     gamma_min = yt.YTQuantity(10, 'dimensionless')
     # Index for electron power law distribution
-    p = 2
+    p = 2.0
     pol_ratio = (p+1.)/(p+7./3.)
     # Fitted constants for the approximated power-law + exponential spectra
-    # Integral of 2*F(x) -> tot_const*nu**-2*exp(-nu/nuc)
+    # Integral of 2*F(x) -> tot_const*(nu**-2)*exp(-nu/nuc)
     tot_const = 4.1648
 
 
@@ -370,11 +370,13 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
                          data[('gas', 'magnetic_field_y')],\
                          data[('gas', 'magnetic_field_z')]], axis=-1)
         Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
+        # cos = cos(theta), theta is the angle between projected B and xvec
         cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
         cos[np.isnan(cos)] = 0.0
-        #import pdb; pdb.set_trace()
         fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
-        return data[fname_nn_emis]*pol_ratio*(2*cos*cos-1.0)
+        # pol_ratio = (perp - para) / (perp + para)
+        # The minus accounts for the perpendicular polarization
+        return -data[fname_nn_emis]*pol_ratio*(2*cos*cos-1.0)
 
     fname_nn_emis_h = ('deposit', 'nn_emissivity_q_%s_%s' % (ptype, nu_str))
     ds.add_field(fname_nn_emis_h, function=_nn_emissivity_q,
@@ -392,7 +394,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
         cos[np.isnan(cos)] = 0.0
         sin[np.isnan(sin)] = 0.0
         fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
-        return data[fname_nn_emis]*pol_ratio*2*sin*cos
+        return -data[fname_nn_emis]*pol_ratio*2*sin*cos
 
     fname_nn_emis_v = ('deposit', 'nn_emissivity_u_%s_%s' % (ptype, nu_str))
     ds.add_field(fname_nn_emis_v, function=_nn_emissivity_u,
