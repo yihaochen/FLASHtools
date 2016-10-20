@@ -168,7 +168,7 @@ def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='neares
     #print ds.field_info[f4].units
 
     fname3 = ('deposit', 'nn_emissivity_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname3, function=_nn_emissivity,
+    ds.add_field(fname3, function=_nn_emissivity, sampling_type='cell',
                  display_name='%s NN Emissivity (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=True,
                  force_override=True)
@@ -199,7 +199,7 @@ def add_synchrotron_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='neares
                 return PB*pfield.mean()*grid[ptype, deposit_field].uq
 
     fname4 =('deposit', 'avgfill_emissivity_%s' % nu_str)
-    ds.add_field(fname4, function=_deposit_average_filling,
+    ds.add_field(fname4, function=_deposit_average_filling, sampling_type='cell',
                  validators=[ValidateGridType()],
                  display_name="%s Emissivity" % nu,
                  units='Jy/cm/arcsec**2', take_log=True,
@@ -288,7 +288,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     fnames = []
     if ('gas', 'jet_volume_fraction') not in ds.derived_field_list:
         ds.add_field(('gas', 'jet_volume_fraction'), function=_jet_volume_fraction,
-                     display_name="Jet Volume Fraction")
+                     display_name="Jet Volume Fraction", sampling_type='cell')
 
     def _synchrotron_spec(field, data):
         ptype = 'io'
@@ -360,7 +360,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     #print ds.field_info[f4].units
 
     fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname_nn_emis, function=_nn_emissivity_i,
+    ds.add_field(fname_nn_emis, function=_nn_emissivity_i, sampling_type='cell',
                  display_name='%s NN Emissivity I (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=True,
                  force_override=True)
@@ -379,7 +379,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
         return -data[fname_nn_emis]*pol_ratio*(2*cos*cos-1.0)
 
     fname_nn_emis_h = ('deposit', 'nn_emissivity_q_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname_nn_emis_h, function=_nn_emissivity_q,
+    ds.add_field(fname_nn_emis_h, function=_nn_emissivity_q, sampling_type='cell',
                  display_name='%s NN Emissivity Q (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=False,
                  force_override=True)
@@ -397,7 +397,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
         return -data[fname_nn_emis]*pol_ratio*2*sin*cos
 
     fname_nn_emis_v = ('deposit', 'nn_emissivity_u_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname_nn_emis_v, function=_nn_emissivity_u,
+    ds.add_field(fname_nn_emis_v, function=_nn_emissivity_u, sampling_type='cell',
                  display_name='%s NN Emissivity U (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=False,
                  force_override=True)
