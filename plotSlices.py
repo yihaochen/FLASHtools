@@ -8,17 +8,18 @@ mu = 1.67E-24
 k = 1.38E-16
 T = 1.0E7
 v = 0.1*3.0E10
-mag = 1.0E-4
+mag = 5.0E-5
 
-Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),'temperature': (1.0E0*T, 1.0E3*T),\
+Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
+            'temperature': (1.0E0*T, 1.0E3*T), 'entropy': (2E1, 1E3),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
-            'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-v,v),\
+            'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-0.3333*v,0.3333*v),\
             #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
             'velocity_magnitude':(1.0E3, 1.0E7),\
             'velocity_para':(-v,v), 'velocity_perp':(-0.05*v, 0.05*v), 'mach':(0.0, 30.0),\
             'plasma_beta':(1, 1E3),\
             'shok': (0.0, 10.0),\
-            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-5*mag*mag, 1.0E-2*mag*mag),\
+            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-4*mag*mag, 1.0E-1*mag*mag),\
             'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
             'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
             'velx': (-v,v), 'vely': (-v,v), 'velz':(-v,v),\
@@ -30,7 +31,8 @@ logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'magx': False, 'magy': False, 'magz': False,\
              'ism ': False, 'jet ': False, 'magp': True,\
              'eint': True, 'shok': False,\
-             'density': True, 'pressure': True, 'temperature': True,\
+             'density': True, 'pressure': True, \
+             'temperature': True, 'entropy': True,\
              'velocity_x': False, 'velocity_y': False, 'velocity_z': False,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
              'velocity_magnitude':True,\
@@ -45,9 +47,10 @@ axis = {'x': 0, 'y':1, 'z':2}
 
 def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
                 zoom_fac=1, nozzleCoords=None, plotgrid=True, plotvelocity=False,\
-                markcenter=False, savepath=None,\
-                show=False, annotate_particles=None, annotate_part_info=None):
-    plot = yt.SlicePlot(ds, proj_axis, field, center=center)#, width=(0.25,0.5))
+                markcenter=False, savepath=None, sim_name=None, width=None,\
+                show=False, annotate_particles=None, annotate_part_info=None,\
+                buff_size=(400,800)):
+    plot = yt.SlicePlot(ds, proj_axis, field, center=center, width=width)
     if plotvelocity:
         scale=10*v
         #scale = 5.0E5
@@ -63,19 +66,27 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
 
     if field in ['ism ', 'jet ', 'shok']:
         plot.set_cmap(field, 'gist_heat')
-    if field in ['shok']:
+    elif field in ['shok']:
         plot.set_cmap(field, 'gist_heat_r')
-    if field in ['plasma_beta']:
+    elif field in ['plasma_beta']:
         plot.set_cmap(field, 'algae_r')
-    if field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
+    elif field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
                 'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp']:
-        plot.set_cmap(field, 'RdBu_r')
+        plot.set_cmap(field, 'seismic')
+    else:
+        plot.set_cmap(field, 'algae')
+    #if field in ['magnetic_pressure'] and proj_axis=='x':
+    #    plot.annotate_line_integral_convolution('magnetic_field_y', 'magnetic_field_z', lim=(0.4,0.65), cmap='binary', alpha=0.8)
+
     plot.set_log(field, logfield[field])
     mi, ma = Extrema[field]
     plot.set_zlim(field, mi, ma)
     plot.zoom(zoom_fac)
-    #plot.annotate_timestamp(0.20, 0.95, normalized=True, format="{time:6.3f} {units}")
-    plot.annotate_timestamp(0.20, 0.95, time_format="{time:6.3f} {units}", time_unit='Myr')
+    plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
+                            time_unit='Myr', draw_inset_box=True)
+    if sim_name:
+        plot.annotate_text((0.85, 0.95), sim_name, coord_system='axis',
+                           text_args={'color':'k'})
     if annotate_particles:
         try:
             #slab_width = ds.domain_width.value[axis[proj_axis]] - 2.0*center[axis[proj_axis]]
