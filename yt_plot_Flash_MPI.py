@@ -12,9 +12,9 @@ logging.getLogger('yt').setLevel(logging.ERROR)
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tools import calcNozzleCoords, calcDen0
 from plotSlices import plotSliceField
 from plotProjections import plotProjectionField
+from particle_filters import *
 
 #dirs = ['/home/ychen/data/0only_0314_h1_nojiggle',\
 #        '/home/ychen/data/0only_0330_h0_nojiggle',\
@@ -28,9 +28,10 @@ dirs = ['./']
 #regex = 'MHD_Jet*_hdf5_plt_cnt_0[2-9][0,2,4,6,8]0'
 regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [1]
+zoom_facs = [8]
 proj_axes= ['x']
 figuredirtemplate = 'figures%s_zoom%i'
+ptype = 'jetp'
 
 
 #annotate_particles = True if zoom_fac >= 2 else False
@@ -47,7 +48,7 @@ fields = ['particle_gamc']
 
 
 def rescan(dir, printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=False, printlist=printlist, reverse=False)
+    files = util.scan_files(dir, regex=regex, walk=False, printlist=printlist, reverse=True)
     return files
 
 e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
@@ -65,6 +66,8 @@ def worker_fn(file, field, proj_axis, zoom_fac):
     #    global fields_part
     #    fields_part = False
     ds = yt.load(file.fullpath)
+    ds.add_particle_filter(ptype)
+    ds.periodicity = (True, True, True)
 
     #nozzleCoords = calcNozzleCoords(ds, proj_axis)
     #nozzleCoords = None if proj_axis=='z' or zoom_fac<4 else nozzleCoords
@@ -88,86 +91,39 @@ def worker_fn(file, field, proj_axis, zoom_fac):
         sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
 
     if field in ['particle_gamc', 'particle_age', 'particle_nuc', 'particle_magp']:
-        ad = ds.all_data()
-        #den0 = calcDen0(ad['all', 'particle_tadd'])
-        if ('all', 'particle_type') in ds.derived_field_list:
-            jetfil = np.logical_and((ad['all', 'particle_type'] == 1.0),\
-                                    (ad['all', 'particle_shok'] <= 0.01))
-        else:
-            jetfil = (ad['all', 'particle_shok'] <= 0.01)
-        jetfil = np.logical_and(jetfil,ad['all', 'particle_tag'] % 10 == 0)
-        #corefil = np.logical_and((ad['all', 'particle_den0']>den0-5E-31),\
-        #                        (ad['all', 'particle_den0']<den0+5E-31))
-        #initfil = ad['all', 'particle_tadd'] < 1.58E13
-        #filter = np.logical_and(jetfil, np.logical_not(corefil))
-        #filter = np.logical_and(jetfil, corefil)
-        filter = jetfil
-        #filter = ad['all', 'particle_tag'] % 5 == 0
-        if field == 'particle_gamc':
-            fdata = np.log10(np.abs(ad['all', 'particle_gamc'][filter]))
-            vmin=2.5; vmax=4; cmap='algae'
-            cblabel=u'log $\gamma_c$'
-        elif field == 'particle_age':
-            fdata = (ds.current_time.v - ad['all', 'particle_tadd'][filter])/ds.current_time.v
-            vmin=0; vmax=1; cmap='algae_r'
-            cblabel='normalized age'
-        elif field == 'particle_nuc':
-            B = np.sqrt(ad[('all', 'particle_magx')][filter]**2
-                       +ad[('all', 'particle_magy')][filter]**2
-                       +ad[('all', 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
-            B = ad.apply_units(B, 'gauss')
-            # Cutoff frequency
-            fdata = np.log10(3.0*ad[('all', 'particle_gamc')][filter]**2*e*B/(4.0*np.pi*me*c))
-            vmin=6; vmax=10; cmap='algae'
-            cblabel=u'log $\\nu_c$'
-        elif field == 'particle_magp':
-            magp = (ad[('all', 'particle_magx')][filter]**2
-                   +ad[('all', 'particle_magy')][filter]**2
-                   +ad[('all', 'particle_magz')][filter]**2)/2
-            magp = ad.apply_units(magp, 'erg/cm**3')
-            fdata = np.log10(magp)
-            vmin=-12; vmax=-10; cmap='algae'
-            cblabel=u'log$P_B$'
-
         if proj_axis == 'x':
-            xaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
-            yaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,12))
-            xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-        elif proj_axis == 'y':
-            xaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
-            yaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(12,6))
-            xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-        elif proj_axis == 'z':
-            xaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
-            yaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,7))
-            xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+            xfield = (ptype, 'particle_position_y')
+            yfield = (ptype, 'particle_position_z')
+        else:
+            raise ValueError
+        cfield = (ptype, 'particle_gamc')
+        plot = yt.ParticlePlot(ds, xfield, yfield, cfield)
+        plot.zoom(zoom_fac)
+        plot.set_zlim(cfield, 1E2, 1E5)
+        plot.set_cmap(cfield, 'algae')
 
-        #plt.hist(gamc, bins=50)
-        ax=fig.add_subplot(111)
-        ax.set_xlim(-xlim,xlim)
-        ax.set_ylim(-ylim,ylim)
-        ax.set_xlabel('kpc')
-        ax.set_ylabel('kpc')
-        ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
-                    (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
-                    horizontalalignment='left', verticalalignment='center')
-        ax.annotate(sim_name, (1,0), xytext=(0.85, 0.96), textcoords='axes fraction',\
-                    horizontalalignment='left', verticalalignment='center')
+        #if proj_axis == 'x':
+        #    xaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
+        #    yaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
+        #    fig=plt.figure(figsize=(8,12))
+        #    xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+        #    ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+        #elif proj_axis == 'y':
+        #    xaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
+        #    yaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
+        #    fig=plt.figure(figsize=(12,6))
+        #    xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+        #    ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+        #elif proj_axis == 'z':
+        #    xaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
+        #    yaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
+        #    fig=plt.figure(figsize=(8,7))
+        #    xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+        #    ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+        plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
+                                time_unit='Myr', text_args={'color':'k'})
 
-        sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
-        try:
-            cb=plt.colorbar(sc)
-            cb.set_label(cblabel)
-        except:
-            pass
-        plt.tight_layout()
-        plt.savefig(os.path.join(file.pathname,figuredir,field,file.filename), dpi=150)
+        plot.save(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip()))
 
     else:
         plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
@@ -202,8 +158,12 @@ def init():
                 if not os.path.exists(os.path.join(dir,figuredir)):
                     os.mkdir(os.path.join(dir, figuredir))
                 for field in fields:
-                    if not os.path.exists(os.path.join(dir,figuredir,field.strip())):
-                        os.mkdir(os.path.join(dir,figuredir,field.strip()))
+                    if 'particle' in field:
+                        fielddir = ptype+'_'+field.strip()
+                    else:
+                        fielddir = field.strip()
+                    if not os.path.exists(os.path.join(dir,figuredir,fielddir)):
+                        os.mkdir(os.path.join(dir,figuredir,fielddir))
 
 i0 = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 tasks = tasks_gen(dirs, i0, fields, proj_axes, zoom_facs)
