@@ -31,6 +31,8 @@ def worker_fn(dirname, filepath):
     ds = yt.load(filepath)
     factor = 4 if '10Myr' in dirname else 8
     zlim = (ds.domain_left_edge[2]/factor, ds.domain_right_edge[2]/factor)
+    rlim = (0.0, ds.domain_right_edge[0]/factor)
+
     #zlim = (0.0, ds.domain_right_edge[2]/8.0)
     ad = ds.all_data()
     prof = yt.create_profile(ad, 'z', ['jet '], logs={'z': False}, n_bins=2048, \
@@ -46,20 +48,40 @@ def worker_fn(dirname, filepath):
             zmin = z
             break
 
+
+
     kpc = yt.units.kpc.in_units('cm')
+
+    # Upper half of the simulation domain
     leftedge = [-30*kpc, -30*kpc, 0.0]
     rightedge = [ 30*kpc, 30*kpc, zmax.in_units('cm')*1.2]
     upbox = ds.box(leftedge, rightedge)
     upcenter = np.sum(upbox['jet ']*upbox['cell_mass']*upbox['z'])/np.sum(upbox['jet ']*upbox['cell_mass'])
 
+    rmax_up = 0
+    rprof = yt.create_profile(upbox, 'cylindrical_r', ['jet '], logs={'cylindrical_r': False}, n_bins=1024, \
+                             weight_field='cell_mass', extrema={'cylindrical_r': rlim})
+    for (r, jet) in reversed(zip(rprof.x, rprof['jet '])):
+        if jet > 1E-6:
+            rmax_up = r
+            break
 
+    # Lower half of the simulation domain
     leftedge = [-30*kpc, -30*kpc, zmin.in_units('cm')*1.2]
     rightedge = [ 30*kpc, 30*kpc, 0.0]
     bottombox = ds.box(leftedge, rightedge)
     bottomcenter = np.sum(bottombox['jet ']*bottombox['cell_mass']*bottombox['z'])/np.sum(bottombox['jet ']*bottombox['cell_mass'])
 
+    rmax_low = 0
+    rprof = yt.create_profile(bottombox, 'cylindrical_r', ['jet '], logs={'cylindrical_r': False}, n_bins=1024, \
+                             weight_field='cell_mass', extrema={'cylindrical_r': rlim})
+    for (r, jet) in reversed(zip(rprof.x, rprof['jet '])):
+        if jet > 1E-6:
+            rmax_low = r
+            break
+
     return int(ds.basename[-4:]), ds.current_time.in_units('Myr'), zmax.in_units('kpc'), zmin.in_units('kpc'), \
-           upcenter.in_units('kpc'), bottomcenter.in_units('kpc')
+           upcenter.in_units('kpc'), bottomcenter.in_units('kpc'), rmax_up.in_units('kpc'), rmax_low.in_units('kpc')
 
 def tasks_gen(dirs):
     for dir in dirs:
@@ -88,8 +110,8 @@ if results:
     #picklename = time.strftime("Bflux_table_%Y%m%d_%H%M%S.pickle")
     #pickle.dump(collected, open( picklename, "wb" ))
 
-    fmt = '%04d  %6.3f %6.3f %6.3f %6.3f %6.3f'
-    header = 'filenumber, t(Myr), zEdge+(kpc), zEdge-(kpc), zCenter+(kpc), zCenter-(kpc), '
+    fmt = '%04d  %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f'
+    header = 'filenumber, t(Myr), zEdge+(kpc), zEdge-(kpc), zCenter+(kpc), zCenter-(kpc), rEdge+(kpc), rEdge-(kpc)'
     for dirname in collected.keys():
         #print np.asarray(collected[dirname])
         np.savetxt(dirname+'/GridAnalysis_LobeSize.txt', np.asarray(collected[dirname]), fmt=fmt, header=header)
