@@ -4,7 +4,6 @@ from yt.data_objects.particle_filters import add_particle_filter
 from yt.data_objects.particle_unions import ParticleUnion
 from yt.fields.derived_field import ValidateGridType
 from yt.fields.field_detector import FieldDetector
-from tools import calcDen0
 from functools import partial
 from particle_filters import *
 
