@@ -36,14 +36,14 @@ ptype = 'jetp'
 
 #annotate_particles = True if zoom_fac >= 2 else False
 fields_velocity = None
-fields_part = ['density']
+fields_part = ['velocity_y']
 fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
           'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
-           'particle_gamc', 'plasma_beta', 'entropy']
+          'plasma_beta', 'entropy', 'particle_gamc']
 #fields = ['density', 'pressure', 'temperature', 'velocity_x', 'velocity_z', 'jet ',\
 #          'entropy']
 #fields = ['particle_nuc', 'particle_gamc', 'particle_age', 'particle_magp']
-fields = ['particle_gamc']
+#fields = ['particle_gamc']
 #fields = ['plasma_beta']
 
 
@@ -91,39 +91,87 @@ def worker_fn(file, field, proj_axis, zoom_fac):
         sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
 
     if field in ['particle_gamc', 'particle_age', 'particle_nuc', 'particle_magp']:
-        if proj_axis == 'x':
-            xfield = (ptype, 'particle_position_y')
-            yfield = (ptype, 'particle_position_z')
-        else:
-            raise ValueError
-        cfield = (ptype, 'particle_gamc')
-        plot = yt.ParticlePlot(ds, xfield, yfield, cfield)
-        plot.zoom(zoom_fac)
-        plot.set_zlim(cfield, 1E2, 1E5)
-        plot.set_cmap(cfield, 'algae')
-
+        ad = ds.all_data()
         #if proj_axis == 'x':
-        #    xaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
-        #    yaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
-        #    fig=plt.figure(figsize=(8,12))
-        #    xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-        #    ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-        #elif proj_axis == 'y':
-        #    xaxis = ad['all', 'particle_position_z'][filter]/3.08567758E21
-        #    yaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
-        #    fig=plt.figure(figsize=(12,6))
-        #    xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-        #    ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-        #elif proj_axis == 'z':
-        #    xaxis = ad['all', 'particle_position_x'][filter]/3.08567758E21
-        #    yaxis = ad['all', 'particle_position_y'][filter]/3.08567758E21
-        #    fig=plt.figure(figsize=(8,7))
-        #    xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-        #    ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-        plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
-                                time_unit='Myr', text_args={'color':'k'})
+        #    xfield = (ptype, 'particle_position_y')
+        #    yfield = (ptype, 'particle_position_z')
+        #else:
+        #    raise ValueError
+        #cfield = (ptype, field)
+        #plot = yt.ParticlePlot(ds, xfield, yfield, cfield)
+        #plot.zoom(zoom_fac)
+        #plot.set_zlim(cfield, 1E2, 1E5)
+        #plot.set_cmap(cfield, 'algae')
+        #plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
+        #                        time_unit='Myr', text_args={'color':'k'})
+        filter = ad[ptype, 'particle_tag'] % 5 == 0
 
-        plot.save(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip()))
+        if field == 'particle_gamc':
+            fdata = np.log10(np.abs(ad[ptype, 'particle_gamc'][filter]))
+            vmin=2.5; vmax=4; cmap='algae'
+            cblabel=u'log $\gamma_c$'
+        elif field == 'particle_age':
+            fdata = (ds.current_time.v - ad[ptype, 'particle_tadd'][filter])/ds.current_time.v
+            vmin=0; vmax=1; cmap='algae_r'
+            cblabel='normalized age'
+        elif field == 'particle_nuc':
+            B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
+                       +ad[(ptype, 'particle_magy')][filter]**2
+                       +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
+            B = ad.apply_units(B, 'gauss')
+            # Cutoff frequency
+            fdata = np.log10(3.0*ad[(ptype, 'particle_gamc')][filter]**2*e*B/(4.0*np.pi*me*c))
+            vmin=6; vmax=10; cmap='algae'
+            cblabel=u'log $\\nu_c$'
+        elif field == 'particle_magp':
+            magp = (ad[(ptype, 'particle_magx')][filter]**2
+                   +ad[(ptype, 'particle_magy')][filter]**2
+                   +ad[(ptype, 'particle_magz')][filter]**2)/2
+            magp = ad.apply_units(magp, 'erg/cm**3')
+            fdata = np.log10(magp)
+            vmin=-12; vmax=-10; cmap='algae'
+            cblabel=u'log$P_B$'
+
+        if proj_axis == 'x':
+            xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
+            yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
+            fig=plt.figure(figsize=(8,12))
+            xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+            ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+        elif proj_axis == 'y':
+            xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
+            yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
+            fig=plt.figure(figsize=(12,6))
+            xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+            ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+        elif proj_axis == 'z':
+            xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
+            yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
+            fig=plt.figure(figsize=(8,7))
+            xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+            ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+
+        ax=fig.add_subplot(111)
+        ax.set_xlim(-xlim,xlim)
+        ax.set_ylim(-ylim,ylim)
+        ax.set_xlabel('kpc')
+        ax.set_ylabel('kpc')
+        ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
+                    (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
+                    horizontalalignment='left', verticalalignment='center')
+        ax.annotate(sim_name, (1,0), xytext=(0.85, 0.96), textcoords='axes fraction',\
+                    horizontalalignment='left', verticalalignment='center')
+
+        sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
+        try:
+            cb=plt.colorbar(sc)
+            cb.set_label(cblabel)
+        except:
+            pass
+        plt.tight_layout()
+        plt.savefig(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip(),file.filename), dpi=150)
+
+        #plot.save(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip()))
 
     else:
         plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
