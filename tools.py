@@ -15,9 +15,12 @@ def read_par(dir, parfile='flash.par'):
 
 
 def calcNozzleCoords(ds, proj_axis):
+    # Axial direction of the jet nozzle
+    # TODO: Not functional now, since the vectors are the inital runtime parameters, not scalars in FLASH
     zvec = np.array([ds.parameters['nozzlevecx'],\
                      ds.parameters['nozzlevecy'],\
                      ds.parameters['nozzlevecz']])
+    # Radial vectors of the jet nozzle
     rxvec = np.cross(zvec, np.array([0.,1E-10,1.]))
     rxvec /= np.sqrt(sum(rxvec**2))
     ryvec = np.cross(zvec, rxvec)
@@ -25,20 +28,25 @@ def calcNozzleCoords(ds, proj_axis):
     r = ds.parameters['nozzleradius']+ds.parameters['rfeatherout']
     l = ds.parameters['nozzlehalfl']
 
+    # Number of points in the ring for annotating the nozzle
+    # Total number of points will be 3*nPnt
     nPnt = 12
     xx = [np.cos(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
     yy = [np.sin(th) for th in np.linspace(0,2*np.pi, nPnt, endpoint=False)]
+
+    # Position vector of the ring points from the center of the ring
     nozzleCorners = np.zeros([3*nPnt,3])
     for i in range(nPnt):
+        # Points at the upper edge of the nozzle
         nozzleCorners[i,:] =        r*(xx[i]*rxvec + yy[i]*ryvec) + l*zvec
+        # Points at the central cross-section of the nozzle
         nozzleCorners[nPnt+i,:] =   r*(xx[i]*rxvec + yy[i]*ryvec)
+        # Points at the lower edge of the nozzle
         nozzleCorners[2*nPnt+i,:] = r*(xx[i]*rxvec + yy[i]*ryvec) - l*zvec
 
     axisDict = { 'x': 0, 'y': 1, 'z': 2 }
     iaxis = axisDict[proj_axis]
     sizes = nozzleCorners[:,iaxis]/(max(nozzleCorners[:,iaxis])-min(nozzleCorners[:,iaxis]))
-
-
 
     planeDict = { 'x': (1,2), 'y': (2,0), 'z': (0,1) }
     idim = planeDict[proj_axis]
@@ -47,9 +55,10 @@ def calcNozzleCoords(ds, proj_axis):
                  ds.parameters['nozzleposy'],\
                  ds.parameters['nozzleposz']]
 
-
-    nozzleCoords = [([ corner[idim[0]] + nozzlePos[idim[0]],\
-                       corner[idim[1]] + nozzlePos[idim[1]] ], size)\
+    #nozzleCoords = [([ corner[idim[0]] + nozzlePos[idim[0]],\
+    #                   corner[idim[1]] + nozzlePos[idim[1]] ], size)\
+    #               for corner, size in zip(nozzleCorners[sizes.argsort()], sorted(sizes)) ]
+    nozzleCoords = [(corner + nozzlePos, size)\
                    for corner, size in zip(nozzleCorners[sizes.argsort()], sorted(sizes)) ]
 
     return nozzleCoords
@@ -147,8 +156,24 @@ def calcNozzleCoords_from_pars(pars, t, proj_axis='x'):
 
     return nozzleCoords
 
-def calcDen0(tadd, t1=1.58E13, v=3E9, g=1.33333, r=7.5E20, bf=1.875E20, initM=5, mach=10):
+def calcDen0_2015(tadd, t1=1.58E13, v=3E9, g=1.33333, r=7.5E20, bf=1.875E20, initM=5, mach=10):
     M = initM+(mach-initM)*np.cos(0.5*np.pi*np.clip((tadd-t1)/t1, -1.0, 0.0))
     den0 = 0.5*1E45/np.pi/v**3/( 0.5*r*r*(1.+1./M**2/(g-1.)) + r*bf*(0.3125+1./M**2/(g-1.))\
                              + bf*bf*(0.06056+0.29736/M**2/(g-1.)) )
+    return den0
+
+def calcDen0(data, ptype='io'):
+    p = data.ds.parameters
+    tadd = data[ptype, 'particle_tadd']
+    h = p['sim_helicityjet']
+    g = p['sim_gammajet']
+    R = p['nozzleradius']
+    bf = p['rfeatherout']
+    initM = p['sim_initmachjet']
+    M = p['sim_machjet']
+    t1 = p['sim_duration']/100.0
+    x = g/(g-1.0)+h**2/(1.0+h**2)/p['sim_betajet']
+    M = initM+(M-initM)*np.cos(0.5*np.pi*np.clip((tadd-t1)/t1, -1.0, 0.0))
+    den0 = 0.5*p['sim_powerjet']/np.pi/p['sim_veljet']**3/( R*R*(0.5+x/M**2/g) + R*bf*(0.3125+x/M**2/g)\
+                                                + bf*bf*(0.06056+0.29736*x/M**2/g) )
     return den0
