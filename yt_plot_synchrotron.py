@@ -8,26 +8,30 @@ import yt
 from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
 import logging
+from yt.utilities.fits_image import FITSProjection
 logging.getLogger('yt').setLevel(logging.INFO)
 
 #nu = yt.YTQuantity(500, 'MHz')
 
 
-dir = '/home/ychen/data/0529_L45_M10_b1_h1/'
+dir = '/home/ychen/data/0only_1110_h0_rerun/'
 #dir = '/home/ychen/data/0only_0605_hinf/'
 #dir = '/home/ychen/data/0only_1022_h1_10Myr/'
 #dir = '/d/d8/ychen/MHD_Jet/0314_L45_M10_b1_h1_nojiggle'
-ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_???0'), parallel=21)
+ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1[0-3]??'), parallel=20)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0600'), parallel=8)
+
+zoom_fac = 8
 
 ptype = 'lobe'
 maindir = os.path.join(dir, 'pol_synchrotron_QU_nn_%s/' % ptype)
 lowres = os.path.join(maindir, 'lowres')
-#spectral_index_dir = os.path.join(maindir, 'spectral_index')
+spectral_index_dir = os.path.join(maindir, 'spectral_index')
 #emisdir = os.path.join(maindir, 'emissivity')
 if yt.is_root():
 #    for subdir in [maindir, spectral_index_dir, emisdir]:
+#    for subdir in [maindir, lowres, spectral_index_dir]:
     for subdir in [maindir, lowres]:
         if not os.path.exists(subdir):
             os.mkdir(subdir)
@@ -42,9 +46,8 @@ for ds in ts.piter():
     #savefn = 'Projection_%s_density_%s.png' % (proj_axis, str(ds).split('_')[-1])
     #proj.save(os.path.join(figuredir,savefn))
 
-    #projs = {}
+    projs = {}
     proj_axis = 'x'
-    #for nu in [(150, 'MHz'), (1.4, 'GHz')]:
     for nu in [(150, 'MHz')]:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
 #        pars = add_synchrotron_emissivity(ds, ptype=ptype, nu=nu)
@@ -110,7 +113,11 @@ for ds in ts.piter():
             fields.append(field)
 
 
-        plot = yt.ProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=((50,'kpc'),(100,'kpc')))
+        width = ds.domain_width[1:]/zoom_fac
+        res = ds.domain_dimensions[1:]*ds.refine_by**ds.index.max_level/zoom_fac/2
+        plot = yt.ProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width)
+        plot.set_buff_size(res)
+        plot.set_axes_unit('kpc')
         frb_I = plot.frb.data[fields[0]].v
         frb_Q = plot.frb.data[fields[1]].v
         frb_U = plot.frb.data[fields[2]].v
@@ -146,15 +153,15 @@ for ds in ts.piter():
 
         ##plot.annotate_grids()
 
+        # Binning pixels for annotating polarization lines
         factor = 16
         # Saving annotated polarization lines images
-        plot.set_buff_size((800, 800))
         plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
         plot.save(maindir)
-        #projs[nu] = plot.data_source
+        projs[nu] = plot.data_source
 
         # Saving low resolution image
-        plot.set_buff_size((800/factor, 800/factor))
+        plot.set_buff_size(res/factor)
         plot._recreate_frb()
         frb_I = plot.frb.data[fields[0]].v
         frb_Q = plot.frb.data[fields[1]].v
@@ -162,7 +169,6 @@ for ds in ts.piter():
         plot.annotate_clear(index=-1)
         plot.annotate_polline(frb_I, frb_Q, frb_U, factor=1)
         plot.save(lowres)
-
 
     #if yt.is_root():
         #pickle.dump(projs, open(dir+'projs/%s_projs.pickle' % ds.basename, 'wb'))
