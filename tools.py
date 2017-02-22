@@ -163,6 +163,9 @@ def calcDen0_2015(tadd, t1=1.58E13, v=3E9, g=1.33333, r=7.5E20, bf=1.875E20, ini
     return den0
 
 def calcDen0(data, ptype='io'):
+    """
+    Calculate the density in the core of the jet according to simulation parameters.
+    """
     p = data.ds.parameters
     tadd = data[ptype, 'particle_tadd']
     h = p['sim_helicityjet']
@@ -174,6 +177,14 @@ def calcDen0(data, ptype='io'):
     t1 = p['sim_duration']/100.0
     x = g/(g-1.0)+h**2/(1.0+h**2)/p['sim_betajet']
     M = initM+(M-initM)*np.cos(0.5*np.pi*np.clip((tadd-t1)/t1, -1.0, 0.0))
-    den0 = 0.5*p['sim_powerjet']/np.pi/p['sim_veljet']**3/( R*R*(0.5+x/M**2/g) + R*bf*(0.3125+x/M**2/g)\
-                                                + bf*bf*(0.06056+0.29736*x/M**2/g) )
+
+    # New simulations in 2016 has 'particle_type' field
+    if data.has_key('particle_type'):
+        den0 = 0.5*p['sim_powerjet']/np.pi/p['sim_veljet']**3/( R*R*(0.5+x/M**2/g) + R*bf*(0.3125+x/M**2/g)\
+                             + bf*bf*(0.06056+0.29736*x/M**2/g) )
+    # For simulations in 2015 (did not include magnetic power)
+    else:
+        den0 = 0.5*p['sim_powerjet']/np.pi/p['sim_veljet']**3/\
+               ( 0.5*R*R*(1.+1./M**2/(g-1.)) + R*bf*(0.3125+1./M**2/(g-1.)) + bf*bf*(0.06056+0.29736/M**2/(g-1.)) )
+
     return den0

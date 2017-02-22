@@ -51,7 +51,7 @@ def jnsp(pfilter, data):
     fil = np.logical_or(jetcore, shok)
     return fil
 
-@yt.particle_filter(name='lobe', requires=["particle_shok"], filtered_type="io")
+@yt.particle_filter(name='lobe', requires=["particle_shok", "particle_den0", "particle_gamc"], filtered_type="io")
 def lobe(pfilter, data):
     c = yt.physical_constants.speed_of_light
     den0 = calcDen0(data, ptype='io')
