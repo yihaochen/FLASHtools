@@ -16,56 +16,39 @@ from plotSlices import plotSliceField
 from plotProjections import plotProjectionField
 from particle_filters import *
 
-#dirs = ['/home/ychen/data/0only_0314_h1_nojiggle',\
-#        '/home/ychen/data/0only_0330_h0_nojiggle',\
-#         '/home/ychen/data/0only_0525_hinf_nojiggle']
-#dirs = ['/home/ychen/data/0only_0518_hydro_nojiggle']
 #dirs = ['/home/ychen/data/0only_1022_h1_10Myr']
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
-#dir = '/d/d9/ychen/FLASH4/stampede/0529_L45_M10_b1_h1/'
-dirs = ['./']
-#regex = 'MHD_Jet*_hdf5_plt_cnt_0[2-9][0,2,4,6,8]0'
-regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
+dirs = ['/home/ychen/data/0only_0529_h1']
+regex = 'MHD_Jet*_hdf5_plt_cnt_[0-1][0-9]00'
+#regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
 zoom_facs = [8]
 proj_axes= ['x']
 figuredirtemplate = 'figures%s_zoom%i'
-ptype = 'jetp'
+ptypes = ['jet', 'jetp', 'lobe']
 
 
 #annotate_particles = True if zoom_fac >= 2 else False
 fields_velocity = None
 fields_part = ['velocity_y']
-fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
-          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
-          'plasma_beta', 'entropy', 'particle_gamc']
-#fields = ['density', 'pressure', 'temperature', 'velocity_x', 'velocity_z', 'jet ',\
-#          'entropy']
-#fields = ['particle_nuc', 'particle_gamc', 'particle_age', 'particle_magp']
-#fields = ['particle_gamc']
-#fields = ['plasma_beta']
+#fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
+#          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
+#          'plasma_beta', 'entropy', 'particle_gamc']
+fields = ['particle_gamc', 'particle_nuc', 'particle_age']
+#fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
 
 
 def rescan(dir, printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=False, printlist=printlist, reverse=True)
+    files = util.scan_files(dir, regex=regex, walk=False, printlist=printlist, reverse=False)
     return files
 
 e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
 me = yt.utilities.physical_constants.mass_electron #9.109E-28
 c  = yt.utilities.physical_constants.speed_of_light #2.998E10
 
-def worker_fn(file, field, proj_axis, zoom_fac):
-    #particle_path = file.fullpath.replace('plt_cnt', 'part')\
-    #                if 'plt_cnt' in file.fullpath\
-    #                else file.fullpath.replace('chk', 'part')
-    #if os.path.exists(particle_path):
-    #    ds = yt.load(file.fullpath, particle_filename=particle_path)
-    #else:
-    #    ds = yt.load(file.fullpath)
-    #    global fields_part
-    #    fields_part = False
-    ds = yt.load(file.fullpath)
+def worker_fn(file, field, proj_axis, zoom_fac, ptype):
+    ds = yt.load(file.fullpath, particle_filename=file.fullpath.replace('plt_cnt', 'part')+'_updated')
     ds.add_particle_filter(ptype)
     ds.periodicity = (True, True, True)
 
@@ -73,10 +56,8 @@ def worker_fn(file, field, proj_axis, zoom_fac):
     #nozzleCoords = None if proj_axis=='z' or zoom_fac<4 else nozzleCoords
     nozzleCoords = None
     center = (0.0,0.0,7.714E22) if proj_axis=='z' else (0.0,0.0,0.0)
-    #center = (6.125E+20,  1.414E+20, -8.953E+20) if zoom_fac==128 else (0.0,0.0,0.0)
     fields_grid = ['density', 'pressure', 'velocity_y', 'velocity_z'] if zoom_fac >=16 \
              else ['velocity_z', 'density']
-    #fields_grid = True
     axis = '_%s' % proj_axis if proj_axis != 'x' else ''
     figuredir = figuredirtemplate % (axis, zoom_fac)
 
@@ -90,7 +71,7 @@ def worker_fn(file, field, proj_axis, zoom_fac):
     else:
         sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
 
-    if field in ['particle_gamc', 'particle_age', 'particle_nuc', 'particle_magp']:
+    if 'particle' in field:
         ad = ds.all_data()
         #if proj_axis == 'x':
         #    xfield = (ptype, 'particle_position_y')
@@ -106,23 +87,37 @@ def worker_fn(file, field, proj_axis, zoom_fac):
         #                        time_unit='Myr', text_args={'color':'k'})
         filter = ad[ptype, 'particle_tag'] % 5 == 0
 
-        if field == 'particle_gamc':
-            fdata = np.log10(np.abs(ad[ptype, 'particle_gamc'][filter]))
-            vmin=2.5; vmax=4; cmap='algae'
-            cblabel=u'log $\gamma_c$'
+        if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
+
+            if 'dtau' in field:
+                gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den1'])**(1./3.) \
+                       / ad[ptype, 'particle_dtau']
+            else:
+                gamc = ad[ptype, 'particle_gamc']
+
+
+            if 'particle_gamc' in field:
+                fdata = np.log10(np.abs(gamc[filter]))
+                vmin=3; vmax=6; cmap='algae'
+                cblabel=u'log $\gamma_c$'
+
+            elif 'particle_nuc' in field:
+                B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
+                           +ad[(ptype, 'particle_magy')][filter]**2
+                           +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
+                B = ad.apply_units(B, 'gauss')
+                # Cutoff frequency
+                fdata = np.log10(3.0*gamc[filter]**2*e*B/(4.0*np.pi*me*c))
+                vmin=7.5; vmax=12; cmap='algae'
+                cblabel=u'log $\\nu_c$'
+
+            if 'dtau' in field:
+                cblabel=cblabel+' (dtau)'
+
         elif field == 'particle_age':
             fdata = (ds.current_time.v - ad[ptype, 'particle_tadd'][filter])/ds.current_time.v
             vmin=0; vmax=1; cmap='algae_r'
             cblabel='normalized age'
-        elif field == 'particle_nuc':
-            B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
-                       +ad[(ptype, 'particle_magy')][filter]**2
-                       +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
-            B = ad.apply_units(B, 'gauss')
-            # Cutoff frequency
-            fdata = np.log10(3.0*ad[(ptype, 'particle_gamc')][filter]**2*e*B/(4.0*np.pi*me*c))
-            vmin=6; vmax=10; cmap='algae'
-            cblabel=u'log $\\nu_c$'
         elif field == 'particle_magp':
             magp = (ad[(ptype, 'particle_magx')][filter]**2
                    +ad[(ptype, 'particle_magy')][filter]**2
@@ -159,7 +154,7 @@ def worker_fn(file, field, proj_axis, zoom_fac):
         ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
                     (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
-        ax.annotate(sim_name, (1,0), xytext=(0.85, 0.96), textcoords='axes fraction',\
+        ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
 
         sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
@@ -170,8 +165,6 @@ def worker_fn(file, field, proj_axis, zoom_fac):
             pass
         plt.tight_layout()
         plt.savefig(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip(),file.filename), dpi=150)
-
-        #plot.save(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip()))
 
     else:
         plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
@@ -186,35 +179,36 @@ def worker_test(file, field, proj_axis, zoom_fac):
     return file.filename, field, proj_axis, zoom_fac
 
 
-def tasks_gen(dirs, i0, fields, proj_axes, zoom_facs):
+def tasks_gen(dirs, i0, fields, proj_axes, zoom_facs, ptypes):
     #sys.stdout.write("Plotting %s... \n" % (file.filename))
     for dir in dirs:
         files = rescan(dir, False)[i0:]
-        for zoom_fac in zoom_facs:
-            for proj_axis in proj_axes:
-                for file in files:
-                    for field in fields:
-                        yield file, field, proj_axis, zoom_fac
+        for ptype in ptypes:
+            for zoom_fac in zoom_facs:
+                for proj_axis in proj_axes:
+                    for file in files:
+                        for field in fields:
+                            yield file, field, proj_axis, zoom_fac, ptype
 
 
 def init():
     for dir in dirs:
-        for zoom_fac in zoom_facs:
-            for proj_axis in proj_axes:
-                axis = '_%s' % proj_axis if proj_axis != 'x' else ''
-                figuredir = figuredirtemplate % (axis, zoom_fac)
-                if not os.path.exists(os.path.join(dir,figuredir)):
-                    os.mkdir(os.path.join(dir, figuredir))
-                for field in fields:
-                    if 'particle' in field:
-                        fielddir = ptype+'_'+field.strip()
-                    else:
-                        fielddir = field.strip()
-                    if not os.path.exists(os.path.join(dir,figuredir,fielddir)):
-                        os.mkdir(os.path.join(dir,figuredir,fielddir))
+        for ptype in ptypes:
+            for zoom_fac in zoom_facs:
+                for proj_axis in proj_axes:
+                    axis = '_%s' % proj_axis if proj_axis != 'x' else ''
+                    figuredir = figuredirtemplate % (axis, zoom_fac)
+                    if not os.path.exists(os.path.join(dir,figuredir)):
+                        os.mkdir(os.path.join(dir, figuredir))
+                    for field in fields:
+                        if 'particle' in field:
+                            fielddir = ptype+'_'+field.strip()
+                        else:
+                            fielddir = field.strip()
+                        if not os.path.exists(os.path.join(dir,figuredir,fielddir)):
+                            os.mkdir(os.path.join(dir,figuredir,fielddir))
 
 i0 = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-tasks = tasks_gen(dirs, i0, fields, proj_axes, zoom_facs)
+tasks = tasks_gen(dirs, i0, fields, proj_axes, zoom_facs, ptypes)
 
 results = MPI_taskpull2.taskpull(worker_fn, tasks, initialize=init, print_result=True)
-#print results

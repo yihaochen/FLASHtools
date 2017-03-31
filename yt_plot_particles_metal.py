@@ -3,6 +3,7 @@ import matplotlib
 matplotlib.use('Agg')
 import yt
 import os
+import sys
 import util
 import MPI_taskpull2
 import logging
@@ -17,13 +18,13 @@ def metal(pfilter, data):
 yt.add_particle_filter("metal", function=metal, filtered_type='all', requires=["particle_type"])
 
 dir = './'
-regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9]0'
+regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0,5]0'
 files = None
 figuredir = 'particles_metal/y_z_r0'
 
 
 def rescan(printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=False)
+    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=True)
     return files
 
 # Load the inital file to identify the inital locations of the metal particles
@@ -36,7 +37,7 @@ rr0 = ad[('metal','particle_position_spherical_radius')].in_units('kpc')[arr]
 
 # Filter the central slab
 xx=ad[('metal', 'particle_posx')].in_units('kpc')[arr]
-filtr = np.abs(xx)<10
+filtr = np.abs(xx)<30
 
 def worker_fn(file):
     ds = yt.load(file.fullpath)
@@ -47,17 +48,17 @@ def worker_fn(file):
     yy=ad[('metal', 'particle_posy')].in_units('kpc')[arr]
     zz=ad[('metal', 'particle_posz')].in_units('kpc')[arr]
 
-    plt.figure(figsize=(12,10))
-    sc=plt.scatter(yy[filtr][:], zz[filtr][:], c=rr0[filtr][:], s=8, lw=0.1, vmax=50, vmin=0, cmap='gnuplot2_r', alpha=0.9)
+    plt.figure(figsize=(6,5))
+    sc=plt.scatter(yy[filtr][::3], zz[filtr][::3], c=rr0[filtr][::3], s=1, lw=0.0, vmax=80, vmin=0, cmap='gnuplot2_r', alpha=0.9)
     cb=plt.colorbar(sc)
     cb.set_label('initial r (kpc)')
-    plt.xlim(-40,40)
-    plt.ylim(-40,40)
+    plt.xlim(-60,60)
+    plt.ylim(-60,60)
     plt.xlabel('y (kpc)')
     plt.ylabel('z (kpc)')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(dir,figuredir,file.filename), dpi=72)
+    plt.savefig(os.path.join(dir,figuredir,file.filename), dpi=150)
 
     return ds.basename[-4: ]
 
