@@ -345,53 +345,6 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     return fname1, fname2, fname_nn_emis, nu_str
 
 
-
-class SynchrotronParticleOutsideJet(object):
-    def __init__(self, filedir='./', filename=None):
-
-        fullpath = os.path.join(filedir, filename)
-        only_on_root(mylog.info, "Loading synchrotron particle tau1 data from %s." % fullpath)
-        read = pickle.load(open(fullpath, 'rb'))
-        self.read = read
-        self.read_dict = read if isinstance(read, dict) else None
-        only_on_root(mylog.info, "Synchrotron particle tau1 data loaded")
-
-
-    def get_dtau_den1(self, data, ptype):
-        tadds = data[(ptype, 'particle_tadd')]
-        tags = data[(ptype, 'particle_tag')]
-
-        newtags = tags + tadds
-        # Check if all elements in newtags are unique
-        if np.unique(newtags).shape != newtags.shape:
-            raise Exception
-
-        tau1 = np.zeros(tags.shape)
-        den1 = data[(ptype, 'particle_den0')]
-        if isinstance(self.read_dict, dict):
-            for i, (tag, tadd) in enumerate(zip(tags, tadds)):
-                try:
-                    print self.read_dict[tag.v,tadd.v]
-                    tau1[i] = self.read_dict[tag.v,tadd.v][3]
-                    den1[i] = self.read_dict[tag.v,tadd.v][2]
-                except KeyError:
-                    print tag.v, tadd.v, 'not in pickled data [dict]'
-
-        else:
-            for i, newtag in enumerate(newtags):
-                if newtag in self.read[:,0]:
-                    ind = np.where(np.isclose(self.read[:,0], newtag))[0][0]
-                    tau1[i] = self.read[ind, 4]
-                    den1[i] = self.read[ind, 3]
-                else:
-                    print tags[i].v, tadds[i].v, 'not in pickled data'
-        dtau = data[(ptype, 'particle_tau')] - tau1
-        mask = dtau < 0.0
-        dtau[mask] = 1E-100
-
-        return dtau, den1
-
-
 def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='nearest', proj_axis='x', \
                                     extend_cells=None):
     me = yt.utilities.physical_constants.mass_electron #9.109E-28
@@ -422,6 +375,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='n
         los = [0.,0.,1.]
         xvec = [1., 0., 0.]
         yvec = [0., 1., 0.]
+    # TODO: xvec and yvec for arbitrary proj_axis
     elif proj_axis is list: los = proj_axis
     else: raise NotImplementedError
     los = np.array(los)
@@ -434,111 +388,31 @@ def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='n
         ds.add_field(('gas', 'jet_volume_fraction'), function=_jet_volume_fraction,
                      display_name="Jet Volume Fraction", sampling_type='cell')
 
-    #dirname = '/home/ychen/lib/FLASH/'
-    #picklefname = '0529_L45_M10_b1_h1_particles_leave_dict.pickle'
-    #spoj = SynchrotronParticleOutsideJet(filedir=dirname, filename=picklefname) 
-
     def _synchrotron_spec(field, data):
         # ptype needs to be 'io' (only in this function)
         ptype = 'io'
         # To convert from FLASH "none" unit to cgs unit, times the B field from FLASH by sqrt(4*pi)
-        #B = np.sqrt(data[(ptype, 'particle_magx')]**2
-        #           +data[(ptype, 'particle_magy')]**2
-        #           +data[(ptype, 'particle_magz')]**2)*np.sqrt(4.0*np.pi)
-        #B = data.apply_units(B, 'gauss')
         Bvec = np.array([data[(ptype, 'particle_magx')],\
                          data[(ptype, 'particle_magy')],\
                          data[(ptype, 'particle_magz')]])*np.sqrt(4.0*np.pi)
         Bvec = data.apply_units(Bvec, 'gauss')
-        #B = np.sqrt(np.sum(Bvec*Bvec, axis=0))
 
         cross = np.cross(los, Bvec, axisb=0)
         Bsina = np.sqrt(np.sum(cross*cross, axis=-1))
         Bsina = data.apply_units(Bsina, 'gauss')
 
-        # To create a newtag identifying individual particles due to repeated tag after simulation restart
-        #tadds = data[(ptype, 'particle_tadd')]
-        #tags = data[(ptype, 'particle_tag')]
-        #newtags = data[(ptype, 'particle_tadd')] + data[(ptype, 'particle_tag')]
         if isinstance(data, FieldDetector):
             return data[ptype, 'particle_dens']/data[ptype, 'particle_den1']**(1./3.)/ \
                     (data[(ptype, 'particle_dtau')])
 
-        # Get the indices of newtags in the loaded array
-        #indices = np.where(np.in1d(read[:,0], newtags))[0]
-        #matches = np.in1d(read[:,0], newtags)
-        #read = read[matches]
-
-        #d = np.abs(read[:,0] - newtags[:,np.newaxis])
-        #matches = np.any(np.isclose(d, 0.0), axis=0)
-        #read = read[matches,:]
-
-        #dtau, den1 = spoj.get_dtau_den1(data, ptype)
         den1 = data[(ptype, 'particle_den1')]
         dtau = data[(ptype, 'particle_dtau')]
-
-        #if read.shape[0] != tags.shape[0]:
-        #if np.any(tau1 == 0.0):
-        #    #print read.shape[0], tags.shape[0]
-        #    #sort_ind = tags.argsort()
-        #    #sort_ind_read = read[:,2].argsort()
-        #    #print 'tag, tadd'
-        #    #for tag, tadd in zip(tags[sort_ind], tadds[sort_ind]):
-        #    #    print tag.v, tadd.v
-        #    #print 'read'
-        #    #for read_tag, read_tadd in zip(read[sort_ind_read,2], read[sort_ind_read,1]):
-        #    #    print read_tag, read_tadd
-        #    print 'data'
-        #    print data
-        #    print 'den1', den1
-        #    print 'dtau', dtau
-        #    print 'vel', data[(ptype, 'particle_velocity_magnitude')]
 
         if np.any(dtau < 0.0):
             print 'negative tau!'
             print data
             print data[(ptype, 'particle_tau')]
             print dtau
-
-        #if newtags.shape[0] > 2:
-        #    print 'newtags:', newtags
-        #    print 'read(sort):' , read[ind,0]
-        #    print
-        #    print 'read:', read[:,0]
-        #    print 'ind:', ind
-
-        #indices = np.where(np.any(np.isclose(d, 0.0), axis=0))[0]
-        #ind = []
-        #for item in read:
-        #    read_tag = item[2]
-        #    read_tadd = item[1]
-        #for tag, tadd in zip(tags, tadds):
-        #    if np.where(read[:,2] == tag
-        #matches_tag = np.in1d(read[:,2], tags)
-        #matches = np.in1d(read[matches_tag,1], tadds)
-        #read = read[matches_tag][matches]
-
-        #matches = np.logical_and(np.in1d(read[:,1], tadds), np.in1d(read[:,2], tags))
-        #indices = np.where(matches)[0]
-
-        #if indices.shape != tags.shape:
-        #    print tags.shape, indices.shape
-        #    sort_ind = tags.argsort()
-        #    sort_ind_read = read[indices,2].argsort()
-        #    for tag, tadd, read_tag, read_tadd in \
-        #            zip(tags[sort_ind], tadds[sort_ind], \
-        #            read[indices,2][sort_ind_read], read[indices,1][sort_ind_read]):
-        #        print read_tag, read_tadd, tag.v, tadd.v
-        #    #print 'indices:', indices
-        #    if indices.shape > tags.shape:
-        #        mask = np.in1d(read[indices,2], tags, invert=True)
-        #        print 'extra read:', read[indices,2][mask]
-        #    else:
-        #        mask = np.in1d(tags, read[indices,2], invert=True)
-        #        print 'extra tags:', tags[mask]
-        #        print 'extra tadds:', tadds[mask]
-        #den1 = read[indices,3]
-        #tau1 = read[indices,4]
 
         gamc = (data[(ptype, 'particle_dens')] / den1)**(1./3.) / dtau
         ind = np.where(gamc < 0.0)[0]
@@ -595,10 +469,6 @@ def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='n
         frac = data['gas', 'jet_volume_fraction']
 
         return PBsina*frac*tot_const*data['deposit', '%s_nn_sync_spec_%s' % (ptype, nu_str)]
-
-
-    #print ds.field_info[('jetp', 'particle_emissivity')].units
-    #print ds.field_info[f4].units
 
     fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
     ds.add_field(fname_nn_emis, function=_nn_emissivity_i, sampling_type='cell',

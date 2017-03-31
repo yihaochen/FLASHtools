@@ -9,13 +9,18 @@ dir = './'
 
 pickle_path = os.path.join(dir, 'particles_leave_dict.pickle')
 
+# Read the pickle file if it already exists
 if os.path.exists(pickle_path):
     print '%s found, unpickling...' % pickle_path
     read = pickle.load(open(pickle_path, 'r'))
     print 'Loaded %s' % pickle_path
 
 else:
-
+################################################################################
+# Go through all particle files and record when the velocity of each individual particle drops
+# below certain threshold. Use combined particle_tadd and particle_tag to identify particles.
+# Save the recorded dictionary to a pickle file.
+################################################################################
     def rescan(printlist=False):
         files = util.scan_files(dir, '*hdf5_part_[0-9][0-9][0-9][0-9]', printlist=printlist)
         return files
@@ -56,9 +61,6 @@ else:
             vz = part[velz]
             vel_magnitude = np.sqrt(vx*vx+vy*vy+vz*vz)
 
-            #if part[tag] == 127225.0 and np.isclose(part[tadd], 218857882571403.5):
-            #    print sim_time, '%.3e' % (vel_magnitude/v_thres), part[dens], part[tau]
-
             # Record new particles that just leave the jet
             if vel_magnitude < v_thres:
                 # Make sure we have positive density and tau (There might be a better way to do this...)
@@ -81,7 +83,9 @@ def rescan(printlist=False):
     return files
 files = rescan(True)
 
-# Write den1 and dtau to the updated particle fields
+################################################################################
+# Write den1 and dtau to the updated particle fields as additional HD5 columns.
+################################################################################
 for f in files[:]:
     h5f  = h5py.File(f.fullpath, 'r')
     h5fr = h5py.File(f.fullpath+'_updated', 'w')
