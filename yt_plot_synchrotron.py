@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import pdb
 import os
+import sys
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ import yt
 from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
 import logging
-logging.getLogger('yt').setLevel(logging.INFO)
+logging.getLogger('yt').setLevel(logging.WARNING)
 from yt.utilities.file_handler import HDF5FileHandler
 from yt.funcs import mylog
 
@@ -22,13 +23,18 @@ def setup_part_file(ds):
 dir = '/home/ychen/data/0only_0529_h1/'
 #dir = '/home/ychen/data/0only_0605_hinf/'
 #dir = '/home/ychen/data/0only_1022_h1_10Myr/'
-ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_0[3-9]00'), parallel=7, setup_function=setup_part_file)
+#ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_13[1-4,6-9]0'), parallel=8, setup_function=setup_part_file)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
+try:
+    ind = int(sys.argv[1])
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%02d[1-4,6-9]0' % ind), parallel=8, setup_function=setup_part_file)
+except IndexError:
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_???0'), parallel=8)
 
 zoom_fac = 8
 
-ptype = 'jetp'
-maindir = os.path.join(dir, 'dtau_synchrotron_QU_nn_gc_%s/' % ptype)
+ptype = 'lobe'
+maindir = os.path.join(dir, 'dtau_synchrotron_QU_nn_%s/' % ptype)
 lowres = os.path.join(maindir, 'lowres')
 spectral_index_dir = os.path.join(maindir, 'spectral_index')
 if yt.is_root():
@@ -41,6 +47,7 @@ for ds in ts.piter():
     projs = {}
     proj_axis = 'x'
     #for nu in [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
+    #for nu in [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
     for nu in [(150, 'MHz'), (1400, 'MHz')]:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
 
@@ -48,7 +55,7 @@ for ds in ts.piter():
         ## Polarizations
         ###########################################################################
 
-        pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=4)
+        pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=None)
         fields = []
         for pol in ['i', 'q', 'u']:
             #figuredir = os.path.join(maindir, 'emissivity_%s' % pol)
@@ -105,7 +112,8 @@ for ds in ts.piter():
         # Binning pixels for annotating polarization lines
         factor = 16
         # Saving annotated polarization lines images
-        plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
+        #if pol in ['q', 'u']:
+        #    plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
         plot.save(maindir)
         projs[nu] = plot.data_source
 
