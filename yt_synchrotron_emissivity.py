@@ -345,7 +345,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     return fname1, fname2, fname_nn_emis, nu_str
 
 
-def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='nearest', proj_axis='x', \
+def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='nearest', proj_axis='x', \
                                     extend_cells=None):
     me = yt.utilities.physical_constants.mass_electron #9.109E-28
     c  = yt.utilities.physical_constants.speed_of_light #2.998E10
@@ -376,7 +376,14 @@ def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='n
         xvec = [1., 0., 0.]
         yvec = [0., 1., 0.]
     # TODO: xvec and yvec for arbitrary proj_axis
-    elif proj_axis is list: los = proj_axis
+    elif proj_axis is list:
+        los = proj_axis
+        if los[0] != 0.:
+            xvec = [0., 1., 0.]
+            yvec = [0., 0., 1.]
+        else:
+            raise NotImplementedError
+
     else: raise NotImplementedError
     los = np.array(los)
     xvec = np.array(xvec)
@@ -437,11 +444,10 @@ def add_synchrotron_dtau_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='n
     fname1 =('io', 'particle_sync_spec_%s' % nu_str)
     ds.add_field(fname1, function=_synchrotron_spec, sampling_type='particle',
                  units='cm**(3/4)*s**(3/2)/g**(3/4)', force_override=True)
-
-    try:
-        ds.add_particle_filter(ptype)
-    except:
-        raise NotImplementedError
+    #try:
+    ds.add_particle_filter(ptype)
+    #except:
+    #    raise NotImplementedError
 
     ###########################################################################
     ## Nearest Neighbor method
