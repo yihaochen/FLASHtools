@@ -52,3 +52,11 @@ docs/_build/
 
 # PyBuilder
 target/
+
+
+# NFS backups
+.nfs*
+
+# Temporary vim files
+.*.swp
+.*.swo
