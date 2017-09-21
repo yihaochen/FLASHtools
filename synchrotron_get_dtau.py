@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import os
 #dir = '/home/ychen/d9/FLASH4/2015_production_runs/0529_L45_M10_b1_h1/'
-dir = './'
+dir = './data/'
 
 pickle_path = os.path.join(dir, 'particles_leave_dict.pickle')
 
@@ -79,7 +79,7 @@ else:
 
 
 def rescan(printlist=False):
-    files = util.scan_files(dir, '*hdf5_part_[0-9][0-9][0-9]0', printlist=printlist)
+    files = util.scan_files(dir, '*hdf5_part_[0-9][0-9][0-9][0-9]', printlist=printlist)
     return files
 files = rescan(True)
 
