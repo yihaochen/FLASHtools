@@ -376,7 +376,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         xvec = [1., 0., 0.]
         yvec = [0., 1., 0.]
     # TODO: xvec and yvec for arbitrary proj_axis
-    elif proj_axis is list:
+    elif type(proj_axis) is list:
         los = proj_axis
         if los[0] != 0.:
             xvec = [0., 1., 0.]
@@ -384,7 +384,8 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         else:
             raise NotImplementedError
 
-    else: raise NotImplementedError
+    else:
+        raise NotImplementedError
     los = np.array(los)
     xvec = np.array(xvec)
     yvec = np.array(yvec)
@@ -416,16 +417,16 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         dtau = data[(ptype, 'particle_dtau')]
 
         if np.any(dtau < 0.0):
-            print 'negative tau!'
-            print data
-            print data[(ptype, 'particle_tau')]
-            print dtau
+            print('negative tau!')
+            print(data)
+            print(data[(ptype, 'particle_tau')])
+            print(dtau)
 
         gamc = (data[(ptype, 'particle_dens')] / den1)**(1./3.) / dtau
         ind = np.where(gamc < 0.0)[0]
         if ind.shape[0] > 0:
-            print ind
-            print gamc
+            print(ind)
+            print(gamc)
 
         #gamc = data[(ptype, 'particle_gamc')]
 
