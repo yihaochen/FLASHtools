@@ -186,7 +186,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     c  = yt.utilities.physical_constants.speed_of_light #2.998E10
     e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
 
-    gamma_min = yt.YTQuantity(10, 'dimensionless')
+    gamma_min = yt.YTQuantity(1, 'dimensionless')
     # Index for electron power law distribution
     p = 2.0
     pol_ratio = (p+1.)/(p+7./3.)
@@ -357,6 +357,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
     pol_ratio = (p+1.)/(p+7./3.)
     # Fitted constants for the approximated power-law + exponential spectra
     # Integral of 2*F(x) -> tot_const*(nu**-2)*exp(-nu/nuc)
+    # 2*F(x) for the total intensity (parallel + perpendicular)
     tot_const = 4.1648
 
 
@@ -375,12 +376,12 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         los = [0.,0.,1.]
         xvec = [1., 0., 0.]
         yvec = [0., 1., 0.]
-    # TODO: xvec and yvec for arbitrary proj_axis
     elif type(proj_axis) is list:
         los = proj_axis
-        if los[0] != 0.:
+        if los[0] != 0.: # not perpendicular to z-axis
             xvec = [0., 1., 0.]
             yvec = [0., 0., 1.]
+        # TODO: xvec and yvec for arbitrary proj_axis
         else:
             raise NotImplementedError
 
