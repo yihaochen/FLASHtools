@@ -44,7 +44,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
     c  = yt.utilities.physical_constants.speed_of_light #2.998E10
     e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
 
-    gamma_min = yt.YTQuantity(1, 'dimensionless')
+    gamma_min = yt.YTQuantity(10, 'dimensionless')
     # Index for electron power law distribution
     p = 2.0
     pol_ratio = (p+1.)/(p+7./3.)
@@ -234,7 +234,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         los = [0.,0.,1.]
         xvec = [1., 0., 0.]
         yvec = [0., 1., 0.]
-    elif type(proj_axis) is list:
+    elif type(proj_axis) is list :
         los = proj_axis
         if los[0] != 0.: # not perpendicular to z-axis
             xvec = [0., 1., 0.]
@@ -264,10 +264,12 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
                          data[(ptype, 'particle_magz')]])*np.sqrt(4.0*np.pi)
         Bvec = data.apply_units(Bvec, 'gauss')
 
-        cross = np.cross(los, Bvec, axisb=0)
-        Bsina = np.sqrt(np.sum(cross*cross, axis=-1))
-        Bsina = data.apply_units(Bsina, 'gauss')
+        B = np.sqrt(np.sum(Bvec*Bvec, axis=0))
 
+        # Do nothing for now. How do we integrate over uniform pitch angle? 
+        Bsina = B
+
+        # Return for the FieldDetector; do nothing
         if isinstance(data, FieldDetector):
             return data[ptype, 'particle_dens']/data[ptype, 'particle_den1']**(1./3.)/ \
                     (data[(ptype, 'particle_dtau')])
@@ -281,6 +283,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
             print(data[(ptype, 'particle_tau')])
             print(dtau)
 
+        # The new cutoff gamma
         gamc = (data[(ptype, 'particle_dens')] / den1)**(1./3.) / dtau
         ind = np.where(gamc < 0.0)[0]
         if ind.shape[0] > 0:
@@ -319,22 +322,17 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         '''
         Emissivity using nearest neighbor. Integrate over line of sight to get intensity.
         '''
-        Bvec = np.array([data[('gas', 'magnetic_field_x')],\
-                         data[('gas', 'magnetic_field_y')],\
-                         data[('gas', 'magnetic_field_z')]])
-        cross = np.cross(los, Bvec, axisb=0)
-        # B * sin(alpha) = (B * |(los x Bvec)|/|los|/|Bvec|)
-        # = |(los x Bvec)|
-        Bsina = np.sqrt(np.sum(cross*cross, axis=-1))
-        Bsina = data.apply_units(Bsina, 'gauss')
+        B = data[('gas', 'magnetic_field_magnitude')]
 
-        # P * B^1.5 /4pi
-        PBsina = data['gas', 'pressure']*Bsina**1.5\
-                 /yt.YTQuantity(4.*np.pi, 'sr')
-                 #*data['gas', 'magnetic_field_strength']**1.5\
+        # P * B^1.5
+        PB = data['gas', 'pressure']*B**1.5\
+             /yt.YTQuantity(4.*np.pi, 'sr')
         frac = data['gas', 'jet_volume_fraction']
 
-        return PBsina*frac*tot_const*data['deposit', '%s_nn_sync_spec_%s' % (ptype, nu_str)]
+        # Integral of 1/2*(sin(alpha))^(5/2) from 0 to pi
+        sina52 = 0.5*1.43777
+
+        return PB*sina52*frac*tot_const*data['deposit', '%s_nn_sync_spec_%s' % (ptype, nu_str)]
 
     fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
     ds.add_field(fname_nn_emis, function=_nn_emissivity_i, sampling_type='cell',
@@ -355,8 +353,8 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         # The minus accounts for the perpendicular polarization
         return -data[fname_nn_emis]*pol_ratio*(2*cos*cos-1.0)
 
-    fname_nn_emis_h = ('deposit', 'nn_emissivity_q_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname_nn_emis_h, function=_nn_emissivity_q, sampling_type='cell',
+    fname_nn_emis_q = ('deposit', 'nn_emissivity_q_%s_%s' % (ptype, nu_str))
+    ds.add_field(fname_nn_emis_q, function=_nn_emissivity_q, sampling_type='cell',
                  display_name='%s NN Emissivity Q (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=False,
                  force_override=True)
@@ -373,8 +371,8 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
         fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
         return -data[fname_nn_emis]*pol_ratio*2*sin*cos
 
-    fname_nn_emis_v = ('deposit', 'nn_emissivity_u_%s_%s' % (ptype, nu_str))
-    ds.add_field(fname_nn_emis_v, function=_nn_emissivity_u, sampling_type='cell',
+    fname_nn_emis_u = ('deposit', 'nn_emissivity_u_%s_%s' % (ptype, nu_str))
+    ds.add_field(fname_nn_emis_u, function=_nn_emissivity_u, sampling_type='cell',
                  display_name='%s NN Emissivity U (%s)' % (nu_str, ptype),
                  units='Jy/cm/arcsec**2', take_log=False,
                  force_override=True)
