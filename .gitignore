@@ -60,3 +60,14 @@ target/
 # Temporary vim files
 .*.swp
 .*.swo
+
+# Generated Figures and Files
+figures/
+GridAnalysis/GridAnalysis_Solenoidal_Energy.txt
+Jiggle/jiggle_patterns/
+
+# Notebook Checkpoints
+.ipynb_checkpoints/
+
+# Testing scripts
+*test.ipynb
