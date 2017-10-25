@@ -9,7 +9,7 @@ import yt
 from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
 import logging
-logging.getLogger('yt').setLevel(logging.WARNING)
+logging.getLogger('yt').setLevel(logging.DEBUG)
 from yt.utilities.file_handler import HDF5FileHandler
 from yt.funcs import mylog
 
@@ -20,21 +20,23 @@ def setup_part_file(ds):
     mylog.info('Changed particle files to:' + ds.particle_filename)
 
 #dir = '/home/ychen/data/0only_1110_h0_rerun/'
-dir = '/home/ychen/data/0only_0529_h1/'
+#dir = '/home/ychen/data/0only_0529_h1/'
 #dir = '/home/ychen/data/0only_0605_hinf/'
-#dir = '/home/ychen/data/0only_1022_h1_10Myr/'
+dir = '/d/d11/ychen/2015_production_runs/0529_L45_M10_b1_h1/'
+#dir = '/home/ychen/data/0517_h1_20Myr/'
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_13[1-4,6-9]0'), parallel=8, setup_function=setup_part_file)
 #ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
-try:
-    ind = int(sys.argv[1])
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%02d[1-4,6-9]0' % ind), parallel=8, setup_function=setup_part_file)
-except IndexError:
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_???0'), parallel=8)
+#try:
+#    ind = int(sys.argv[1])
+#    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_0%02d[0-9]' % ind), parallel=10, setup_function=setup_part_file)
+#except IndexError:
+if True:
+    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_0630'), parallel=1, setup_function=setup_part_file)
 
-zoom_fac = 8
+zoom_fac = 16
 
 ptype = 'lobe'
-maindir = os.path.join(dir, 'dtau_synchrotron_QU_nn_%s/' % ptype)
+maindir = os.path.join(dir, 'dtau_synchrotron_QU_nn_%s_offaxis/' % ptype)
 lowres = os.path.join(maindir, 'lowres')
 spectral_index_dir = os.path.join(maindir, 'spectral_index')
 if yt.is_root():
@@ -45,7 +47,7 @@ if yt.is_root():
 for ds in ts.piter():
 
     projs = {}
-    proj_axis = 'x'
+    proj_axis = [0.5,0,1]
     #for nu in [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
     #for nu in [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
     for nu in [(150, 'MHz'), (1400, 'MHz')]:
@@ -64,18 +66,18 @@ for ds in ts.piter():
             #        os.mkdir(figuredir)
             field = ('deposit', ('nn_emissivity_%s_%s_%%.1f%%s' % (pol, ptype)) % nu)
             fields.append(field)
+        #fields = ['density', 'pressure']
 
 
         width = ds.domain_width[1:]/zoom_fac
-        res = ds.domain_dimensions[1:]*ds.refine_by**ds.index.max_level/zoom_fac/2
-        plot = yt.ProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width)
+        res = ds.domain_dimensions[1:]*ds.refine_by**ds.index.max_level//zoom_fac//2
+        #plot = yt.ProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width)
+        plot = yt.OffAxisProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width, north_vector=[0,0,1])
         plot.set_buff_size(res)
         plot.set_axes_unit('kpc')
-        frb_I = plot.frb.data[fields[0]].v
-        frb_Q = plot.frb.data[fields[1]].v
-        frb_U = plot.frb.data[fields[2]].v
-        #plot.save(maindir)
 
+        # Setting up colormaps
+        # Use "hot" for intensity plot and seismic for Q and U plots
         for field in fields:
             if 'nn_emissivity_i' in field[1]:
                 plot.set_zlim(field, 1E-3/norm, 1E1/norm)
@@ -85,7 +87,7 @@ for ds in ts.piter():
                 cmap.set_bad('k')
                 plot.set_cmap(field, cmap)
 
-            else:
+            elif 'nn_emissivity' in field[1]:
                 cmap = plt.cm.seismic
                 #cmap.set_bad('k')
                 plot.set_cmap(field, cmap)
@@ -105,25 +107,25 @@ for ds in ts.piter():
 
         #plot.annotate_grids()
 
-        ###########################################################################
-        ## Low resolution plots for annotating polarization lines
-        ###########################################################################
-
-        # Binning pixels for annotating polarization lines
-        factor = 16
         # Saving annotated polarization lines images
         #if pol in ['q', 'u']:
         #    plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
         plot.save(maindir)
         projs[nu] = plot.data_source
 
+        ###########################################################################
+        ## Low resolution plots for annotating polarization lines
+        ###########################################################################
+
+        # Binning pixels for annotating polarization lines
+        factor = 16
         # Saving low resolution image
-        plot.set_buff_size(res/factor)
+        plot.set_buff_size(res//factor)
         plot._recreate_frb()
         frb_I = plot.frb.data[fields[0]].v
         frb_Q = plot.frb.data[fields[1]].v
         frb_U = plot.frb.data[fields[2]].v
-        plot.annotate_clear(index=-1)
+        #plot.annotate_clear(index=-1)
         plot.annotate_polline(frb_I, frb_Q, frb_U, factor=1)
         plot.save(lowres)
 
