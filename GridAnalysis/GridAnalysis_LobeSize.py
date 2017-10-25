@@ -11,10 +11,17 @@ import logging
 logging.getLogger('yt').setLevel(logging.ERROR)
 
 # Scan for files
-dirs = ['/home/ychen/data/0only_0529_h1/',\
-        '/home/ychen/data/0only_0605_h0/',\
-        '/home/ychen/data/0only_0605_hinf/',\
-        '/home/ychen/data/0only_0602_hydro/']
+dirs = ['/home/ychen/data/0only_0330_h0_nojiggle',\
+        '/home/ychen/data/0only_0518_hydro_nojiggle',\
+        '/home/ychen/data/0only_0314_h1_nojiggle',\
+        '/home/ychen/data/0only_0525_hinf_nojiggle']
+#dirs = ['/home/ychen/data/0only_1106_M3_h1',\
+#        '/home/ychen/data/0only_1204_M24_b01',\
+#        '/home/ychen/data/0only_1110_h0_rerun']
+#dirs = ['/home/ychen/data/0only_0529_h1/',\
+#        '/home/ychen/data/0only_0605_h0/',\
+#        '/home/ychen/data/0only_0605_hinf/',\
+#        '/home/ychen/data/0only_0602_hydro/']
 
 #dirs = ['/home/ychen/data/0only_1022_h1_10Myr/',\
 #        '/home/ychen/data/0only_0204_h0_10Myr/',\
@@ -39,7 +46,7 @@ def worker_fn(dirname, filepath):
                              weight_field='cell_mass', extrema={'z': zlim})
     zmax = 0
     zmin = 0
-    for (z, jet) in reversed(zip(prof.x, prof['jet '])):
+    for (z, jet) in zip(reversed(prof.x), reversed(prof['jet '])):
         if jet > 1E-6:
             zmax = z
             break
@@ -61,7 +68,7 @@ def worker_fn(dirname, filepath):
     rmax_up = 0
     rprof = yt.create_profile(upbox, 'cylindrical_r', ['jet '], logs={'cylindrical_r': False}, n_bins=1024, \
                              weight_field='cell_mass', extrema={'cylindrical_r': rlim})
-    for (r, jet) in reversed(zip(rprof.x, rprof['jet '])):
+    for (r, jet) in zip(reversed(rprof.x), reversed(rprof['jet '])):
         if jet > 1E-6:
             rmax_up = r
             break
@@ -75,7 +82,7 @@ def worker_fn(dirname, filepath):
     rmax_low = 0
     rprof = yt.create_profile(bottombox, 'cylindrical_r', ['jet '], logs={'cylindrical_r': False}, n_bins=1024, \
                              weight_field='cell_mass', extrema={'cylindrical_r': rlim})
-    for (r, jet) in reversed(zip(rprof.x, rprof['jet '])):
+    for (r, jet) in zip(reversed(rprof.x), reversed(rprof['jet '])):
         if jet > 1E-6:
             rmax_low = r
             break
