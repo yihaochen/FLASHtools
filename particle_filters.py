@@ -34,11 +34,17 @@ def shok(pfilter, data):
 
 
 # Lobe particles that include both particles injected at the core and the sheth
-@yt.particle_filter(name='slow', requires=["particle_shok", "particle_den0", "particle_dens"], filtered_type="jet")
+@yt.particle_filter(name='slow', requires=["particle_velocity_magnitude"], filtered_type="jet")
 def slow(pfilter, data):
     c = yt.physical_constants.speed_of_light
     slow = data[pfilter.filtered_type, "particle_velocity_magnitude"] < 0.05*c
     return slow
+
+@yt.particle_filter(name='fast', requires=["particle_velocity_magnitude"], filtered_type="jet")
+def fast(pfilter, data):
+    c = yt.physical_constants.speed_of_light
+    fast = data[pfilter.filtered_type, "particle_velocity_magnitude"] > 0.05*c
+    return fast
 
 
 # Particles injected at the core of the jet
