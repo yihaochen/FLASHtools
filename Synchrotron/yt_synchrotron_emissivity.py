@@ -5,6 +5,8 @@ import yt
 from yt.fields.derived_field import ValidateGridType
 from yt.fields.field_detector import FieldDetector
 from yt.funcs import mylog, only_on_root
+import sys
+sys.path.append('../Particles/')
 from particle_filters import *
 
 def _jet_volume_fraction(field, data):
