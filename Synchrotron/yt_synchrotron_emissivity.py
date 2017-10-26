@@ -169,7 +169,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
                          data[('gas', 'magnetic_field_z')]], axis=-1)
         Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
         # cos = cos(theta), theta is the angle between projected B and xvec
-        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bproj*Bproj, axis=-1))
         cos[np.isnan(cos)] = 0.0
         fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
         # pol_ratio = (perp - para) / (perp + para)
@@ -187,7 +187,7 @@ def add_synchrotron_pol_emissivity(ds, ptype='jnsp', nu=(1.4, 'GHz'), method='ne
                          data[('gas', 'magnetic_field_y')],\
                          data[('gas', 'magnetic_field_z')]], axis=-1)
         Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
-        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bproj*Bproj, axis=-1))
         sin = np.sqrt(1.0-cos*cos)
         cos[np.isnan(cos)] = 0.0
         sin[np.isnan(sin)] = 0.0
@@ -346,7 +346,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
                          data[('gas', 'magnetic_field_z')]], axis=-1)
         Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
         # cos = cos(theta), theta is the angle between projected B and xvec
-        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bproj*Bproj, axis=-1))
         cos[np.isnan(cos)] = 0.0
         fname_nn_emis = ('deposit', 'nn_emissivity_i_%s_%s' % (ptype, nu_str))
         # pol_ratio = (perp - para) / (perp + para)
@@ -364,7 +364,7 @@ def add_synchrotron_dtau_emissivity(ds, ptype='lobe', nu=(1.4, 'GHz'), method='n
                          data[('gas', 'magnetic_field_y')],\
                          data[('gas', 'magnetic_field_z')]], axis=-1)
         Bproj = Bvec - np.expand_dims(np.inner(Bvec, los), -1)*los
-        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bvec*Bvec, axis=-1))
+        cos = np.inner(Bproj, xvec)/np.sqrt(np.sum(Bproj*Bproj, axis=-1))
         sin = np.sqrt(1.0-cos*cos)
         cos[np.isnan(cos)] = 0.0
         sin[np.isnan(sin)] = 0.0
