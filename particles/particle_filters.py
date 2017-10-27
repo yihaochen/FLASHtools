@@ -1,7 +1,5 @@
 import numpy as np
 import yt
-import sys
-sys.path.append('../')
 from tools import calcDen0
 
 # Density tolerence for selecting core and sheth particles
