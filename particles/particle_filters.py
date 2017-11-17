@@ -4,6 +4,8 @@ from tools import calcDen0
 
 # Density tolerence for selecting core and sheth particles
 deltaden0 = 5E-31
+c = yt.physical_constants.speed_of_light
+lobe_v = 0.05*c
 
 @yt.particle_filter(name='metal', requires=["particle_type"], filtered_type="io")
 def metal(pfilter, data):
@@ -37,13 +39,13 @@ def shok(pfilter, data):
 @yt.particle_filter(name='slow', requires=["particle_velocity_magnitude"], filtered_type="jet")
 def slow(pfilter, data):
     c = yt.physical_constants.speed_of_light
-    slow = data[pfilter.filtered_type, "particle_velocity_magnitude"] < 0.05*c
+    slow = data[pfilter.filtered_type, "particle_velocity_magnitude"] < lobe_v
     return slow
 
 @yt.particle_filter(name='fast', requires=["particle_velocity_magnitude"], filtered_type="jet")
 def fast(pfilter, data):
     c = yt.physical_constants.speed_of_light
-    fast = data[pfilter.filtered_type, "particle_velocity_magnitude"] > 0.05*c
+    fast = data[pfilter.filtered_type, "particle_velocity_magnitude"] > lobe_v
     return fast
 
 
@@ -60,8 +62,7 @@ def jetp(pfilter, data):
 # Lobe particles that include only particles injected at the core
 @yt.particle_filter(name='lobe', requires=["particle_shok", "particle_den0", "particle_dens"], filtered_type="jetp")
 def lobe(pfilter, data):
-    c = yt.physical_constants.speed_of_light
-    lobe = data[pfilter.filtered_type, "particle_velocity_magnitude"] < 0.05*c
+    lobe = data[pfilter.filtered_type, "particle_velocity_magnitude"] < lobe_v
     return lobe
 
 
