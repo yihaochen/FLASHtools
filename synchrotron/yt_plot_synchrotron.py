@@ -4,81 +4,84 @@ import os
 import sys
 import matplotlib
 matplotlib.use('Agg')
+matplotlib.rcParams['font.family'] = 'stixgeneral'
 import matplotlib.pyplot as plt
 import yt
 from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
 import logging
-logging.getLogger('yt').setLevel(logging.DEBUG)
+logging.getLogger('yt').setLevel(logging.INFO)
 from yt.utilities.file_handler import HDF5FileHandler
 from yt.funcs import mylog
+from synchrotron.yt_synchrotron_emissivity import setup_part_file,\
+        synchrotron_file_name
+from scipy.ndimage import gaussian_filter
 
-def setup_part_file(ds):
-    filename = os.path.join(ds.directory,ds.basename)
-    ds._particle_handle = HDF5FileHandler(filename.replace('plt_cnt', 'part')+'_updated')
-    ds.particle_filename = filename.replace('plt_cnt', 'part')+'_updated'
-    mylog.info('Changed particle files to:' + ds.particle_filename)
+dir = '/home/ychen/data/00only_0529_h1/'
+#dir = '/home/ychen/data/00only_0605_hinf/'
+#dir = '/home/ychen/data/00only_0605_h0/'
+gc = 32
+try:
+    ind = int(sys.argv[1])
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%02d00' % ind), parallel=1, setup_function=setup_part_file)
+except IndexError:
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_?[7-8]00'), parallel=2, setup_function=setup_part_file)
 
-#dir = '/home/ychen/data/0only_1110_h0_rerun/'
-#dir = '/home/ychen/data/0only_0529_h1/'
-#dir = '/home/ychen/data/0only_0605_hinf/'
-dir = '/d/d11/ychen/2015_production_runs/0529_L45_M10_b1_h1/'
-#dir = '/home/ychen/data/0517_h1_20Myr/'
-#ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_13[1-4,6-9]0'), parallel=8, setup_function=setup_part_file)
-#ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_1410'), parallel=1)
-#try:
-#    ind = int(sys.argv[1])
-#    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_0%02d[0-9]' % ind), parallel=10, setup_function=setup_part_file)
-#except IndexError:
-if True:
-    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_0630'), parallel=1, setup_function=setup_part_file)
+zoom_fac = 8
 
-zoom_fac = 16
-
+proj_axis = 'x'
 ptype = 'lobe'
-maindir = os.path.join(dir, 'dtau_synchrotron_QU_nn_%s_offaxis/' % ptype)
-lowres = os.path.join(maindir, 'lowres')
+maindir = os.path.join(dir, 'cos_synchrotron_QU_nn_%s/' % ptype)
+if proj_axis != 'x':
+    maindir = os.path.join(maindir, '%i_%i_%i' % tuple(proj_axis))
+polline = os.path.join(maindir, 'polline')
 spectral_index_dir = os.path.join(maindir, 'spectral_index')
 if yt.is_root():
-    for subdir in [maindir, lowres, spectral_index_dir]:
+    for subdir in [maindir, polline, spectral_index_dir]:
         if not os.path.exists(subdir):
             os.mkdir(subdir)
 
 for ds in ts.piter():
+    if '0000' in ds.basename: continue
 
-    projs = {}
-    proj_axis = [0.5,0,1]
-    #for nu in [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
-    #for nu in [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
-    for nu in [(150, 'MHz'), (1400, 'MHz')]:
+    projs, frb_I = {}, {}
+    #proj_axis = [0.5,0,1]
+    #nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
+    #nus = [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
+    nus = [(150, 'MHz'), (1.4, 'GHz')]
+    for nu in nus:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
 
         ###########################################################################
         ## Polarizations
         ###########################################################################
 
-        pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=None)
-        fields = []
-        for pol in ['i', 'q', 'u']:
-            #figuredir = os.path.join(maindir, 'emissivity_%s' % pol)
-            #if yt.is_root():
-            #    if not os.path.exists(figuredir):
-            #        os.mkdir(figuredir)
-            field = ('deposit', ('nn_emissivity_%s_%s_%%.1f%%s' % (pol, ptype)) % nu)
-            fields.append(field)
-        #fields = ['density', 'pressure']
+        #pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=None)
+        write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=8)
 
-
-        width = ds.domain_width[1:]/zoom_fac
-        res = ds.domain_dimensions[1:]*ds.refine_by**ds.index.max_level//zoom_fac//2
-        #plot = yt.ProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width)
-        plot = yt.OffAxisProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width, north_vector=[0,0,1])
+        ds_sync = yt.load(synchrotron_file_name(ds, extend_cells=gc))
+        # Need to build the field list for the field_into
+        ds_sync.field_list
+        stokes = StokesFieldName(ptype, nu, proj_axis, field_type='flash')
+        for field in stokes.IQU:
+            ds_sync.field_info[field].units = 'Jy/cm/arcsec**2'
+            ds_sync.field_info[field].output_units = 'Jy/cm/arcsec**2'
+        width = ds_sync.domain_width[1:]/zoom_fac
+        #res = ds_sync.domain_dimensions[1:]*ds_sync.refine_by**ds_sync.index.max_level//zoom_fac//2
+        res = np.array([1200, 2400])
+        mylog.info('Making projection plots')
+        if proj_axis == 'x':
+            plot = yt.ProjectionPlot(ds_sync, proj_axis, stokes.IQU, center=[0,0,0], width=width)
+        else:
+            plot = yt.OffAxisProjectionPlot(ds_sync, proj_axis, stokes.IQU, center=[0,0,0], width=width,
+                                        north_vector=[0,0,1])
+        #plot = yt.OffAxisProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width, north_vector=[0,0,1])
         plot.set_buff_size(res)
         plot.set_axes_unit('kpc')
 
         # Setting up colormaps
         # Use "hot" for intensity plot and seismic for Q and U plots
-        for field in fields:
+        for field in stokes.IQU:
             if 'nn_emissivity_i' in field[1]:
                 plot.set_zlim(field, 1E-3/norm, 1E1/norm)
                 #cmap = plt.cm.get_cmap("algae")
@@ -89,7 +92,6 @@ for ds in ts.piter():
 
             elif 'nn_emissivity' in field[1]:
                 cmap = plt.cm.seismic
-                #cmap.set_bad('k')
                 plot.set_cmap(field, cmap)
                 plot.set_zlim(field, -1E0/norm, 1E0/norm)
 
@@ -110,44 +112,48 @@ for ds in ts.piter():
         # Saving annotated polarization lines images
         #if pol in ['q', 'u']:
         #    plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
-        plot.save(maindir)
-        projs[nu] = plot.data_source
+        if yt.is_root():
+            plot.save(maindir)
+            projs[nu] = plot.data_source
 
-        ###########################################################################
-        ## Low resolution plots for annotating polarization lines
-        ###########################################################################
+            ###########################################################################
+            ## Annotating polarization lines
+            ###########################################################################
 
-        # Binning pixels for annotating polarization lines
-        factor = 16
-        # Saving low resolution image
-        plot.set_buff_size(res//factor)
-        plot._recreate_frb()
-        frb_I = plot.frb.data[fields[0]].v
-        frb_Q = plot.frb.data[fields[1]].v
-        frb_U = plot.frb.data[fields[2]].v
-        #plot.annotate_clear(index=-1)
-        plot.annotate_polline(frb_I, frb_Q, frb_U, factor=1)
-        plot.save(lowres)
+            # Binning pixels for annotating polarization lines
+            factor = 1
+            # Saving polarization lines image
+            plot.set_buff_size(res//factor)
+            plot._recreate_frb()
+            frb_I[nu] = plot.frb.data[stokes.I].v
+            frb_Q = plot.frb.data[stokes.Q].v
+            frb_U = plot.frb.data[stokes.U].v
+            #plot.annotate_clear(index=-1)
+            plot.annotate_polline(frb_I[nu], frb_Q, frb_U, factor=25, scale=15)
+            plot.save(polline)
+        ds_sync.close()
 
     if yt.is_root():
+        sigma = 1
+        nu1, nu2 = nus
+        I1 = gaussian_filter(frb_I[nu1], sigma)
+        I2 = gaussian_filter(frb_I[nu2], sigma)
+        alpha = np.log10(I2/I1)/np.log10(1400/150)
+        alpha = np.ma.masked_where(I2<1E-3, np.array(alpha))
+        ext = ds.arr([-0.5*width[0], 0.5*width[0], -0.5*width[1], 0.5*width[1]])
+        plt.figure(figsize=(8,12), dpi=150)
+        cmap = plt.cm.jet
+        cmap.set_bad('navy')
+        plt.imshow(alpha, cmap=cmap, vmin=-1.5, vmax=-0.5, extent=ext.in_units('kpc'), origin='lower', aspect='equal')
+        plt.xlabel('y (kpc)')
+        plt.ylabel('z (kpc)')
+        plt.axes().tick_params(direction='in')
+        cb = plt.colorbar(fraction=0.10, pad=0, aspect=50)
+        cb.set_label('Spectral Index (%s) (1.4GHz/150MHz)' % ptype)
+        cb.ax.tick_params(direction='in')
         #pickle.dump(projs, open(dir+'projs/%s_projs.pickle' % ds.basename, 'wb'))
         #projs[(1.4, 'GHz')].save_object('proj_1.4GHz', dir+'projs/'+ds.basename+'_projs.cpkl')
         #projs[(150, 'MHz')].save_object('proj_150MHz', dir+'projs/'+ds.basename+'_projs.cpkl')
-
-        ext = ds.arr([-7.72E22, 7.72E22, -1.544E23, 1.544E23], input_units='code_length')
-        frb1 = projs[(1400, 'MHz')].to_frb(ext[1]-ext[0], (512,1024), height=(ext[3]-ext[2]))
-        frb2 = projs[(150, 'MHz')].to_frb(ext[1]-ext[0], (512,1024), height=(ext[3]-ext[2]))
-        S1 = frb1[('deposit', 'nn_emissivity_i_%s_1400.0MHz' % ptype)]
-        S2 = frb2[('deposit', 'nn_emissivity_i_%s_150.0MHz' % ptype)]
-        alpha = np.log(S1/S2)/np.log(1400/150)
-        alpha = np.ma.masked_where(S1<0.001, np.array(alpha))
-
-        fig = plt.figure(figsize=(8,12), dpi=150)
-        ims = plt.imshow(alpha, vmin=-2, vmax=-0.5, extent=ext.in_units('kpc'), origin='lower', aspect='equal')
-        plt.xlabel('z (kpc)')
-        plt.ylabel('x (kpc)')
-        cb = plt.colorbar()
-        cb.set_label('Spectral Index (%s) (1.4GHz/150MHz)' % ptype)
 
         dirnamesplit = dir.split('_')
         if dirnamesplit[-1] in ['h1','hinf', 'h0']:
@@ -165,4 +171,6 @@ for ds in ts.piter():
         plt.savefig(spectral_index_dir+'/%s_proj_spectral_index.png' % ds.basename)
 
     # Done with this dataset
+    mylog.info('Closing file: %s', ds)
+    ds.close()
     del projs
