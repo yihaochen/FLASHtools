@@ -60,7 +60,7 @@ def jetp(pfilter, data):
 
 
 # Lobe particles that include only particles injected at the core
-@yt.particle_filter(name='lobe', requires=["particle_shok", "particle_den0", "particle_dens"], filtered_type="jetp")
+@yt.particle_filter(name='lobe', requires=["particle_velocity_magnitude"], filtered_type="jetp")
 def lobe(pfilter, data):
     lobe = data[pfilter.filtered_type, "particle_velocity_magnitude"] < lobe_v
     return lobe
