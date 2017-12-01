@@ -7,13 +7,14 @@ import os
 #dir = '/home/ychen/d9/FLASH4/2015_production_runs/0529_L45_M10_b1_h1/'
 dir = './data/'
 
+force_overwrite = False
 pickle_path = os.path.join(dir, 'particles_leave_dict.pickle')
 
 # Read the pickle file if it already exists
 if os.path.exists(pickle_path):
-    print '%s found, unpickling...' % pickle_path
-    read = pickle.load(open(pickle_path, 'r'))
-    print 'Loaded %s' % pickle_path
+    print('%s found, unpickling...' % pickle_path)
+    read = pickle.load(open(pickle_path, 'rb'))
+    print('Loaded %s' % pickle_path)
 
 else:
 ################################################################################
@@ -34,7 +35,7 @@ else:
 
     for f in files[:]:
         h5f = h5py.File(f.fullpath, 'r')
-        colname = [item[0].strip() for item in h5f['particle names']]
+        colname = [item[0].decode().strip() for item in h5f['particle names']]
         tag  = colname.index('tag')
         tadd = colname.index('tadd')
         dens = colname.index('dens')
@@ -66,12 +67,14 @@ else:
                 # Make sure we have positive density and tau (There might be a better way to do this...)
                 if part[dens] > 0.0 and part[tau] > 0.0:
                     particles_leave[(part[tag], part[tadd])] = [part[field] for field in fields] + [sim_time]
-        print f.filename, len(particles_leave), val.value.shape[0]
+        print(f.filename, len(particles_leave), val.value.shape[0])
+        if len(particles_leave) == val.value.shape[0]:
+            break
 
 
     #particles_leave = np.array([[key[0] + key[1]] + value for key, value in particles_leave.iteritems()])
     #with open('%s_particles_leave_dict.pickle' % dir.split('/')[-2], 'wb') as f:
-    with open('particles_leave_dict.pickle', 'wb') as f:
+    with open(pickle_path, 'wb') as f:
         pickle.dump(particles_leave, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     read = particles_leave
@@ -88,14 +91,17 @@ files = rescan(True)
 ################################################################################
 for f in files[:]:
     h5f  = h5py.File(f.fullpath, 'r')
+    if os.path.isfile(f.fullpath+'_updated') and not force_overwrite:
+        continue
     h5fr = h5py.File(f.fullpath+'_updated', 'w')
 
-    colname = [item[0].strip() for item in h5f['particle names']]
+    colname = [item[0].decode().strip() for item in h5f['particle names']]
     itag  = colname.index('tag')
     itadd = colname.index('tadd')
     iden0 = colname.index('den0')
     ivelz = colname.index('velz')
     itau  = colname.index('tau')
+    ishok = colname.index('shok')
     tp = h5f['tracer particles'].value
 
     dtau = np.zeros(tp.shape[0])
@@ -107,11 +113,12 @@ for f in files[:]:
             tau1 = read[(tag, tadd)][3]
             dtau[i] = max(tp[i,itau]-tau1, 1E-100)
         except KeyError:
-            print tag, tadd, '%e' % tp[i,ivelz], 'not in pickled data'
+            print('tag: %6i, tadd: %9.3e, velz: %9.2e, shok: %1i not in pickled data' % (tag, tadd, tp[i,ivelz], tp[i,ishok]))
         except:
-            print den1[i]
-            print read
-            print tag, tadd
+            print(den1[i])
+            print(read)
+            print(tag, tadd)
+
     newcols = np.column_stack((den1,dtau))
 
     # Go through each dataset in the particle hdf5 file
@@ -120,7 +127,7 @@ for f in files[:]:
     for v in h5f.values():
         if 'particle names' in v.name:
             shape = (v.shape[0]+2, 1)
-            newfields = [['den1                    '], ['dtau                    ']]
+            newfields = [[b'den1                    '], [b'dtau                    ']]
             data = np.concatenate((v.value, newfields), axis=0)
             h5fr.create_dataset(v.name, shape, v.dtype, data)
         elif 'tracer particles' in v.name:
@@ -132,5 +139,5 @@ for f in files[:]:
         else:
             h5fr.create_dataset(v.name, v.shape, v.dtype, v.value)
     h5f.close()
-    print 'Saving', h5fr.filename
+    print('Saving', h5fr.filename)
     h5fr.close()
