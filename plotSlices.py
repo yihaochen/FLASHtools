@@ -99,7 +99,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
             else:
                 plot.annotate_particles(slab_width)
         except:
-            print 'Cannot plot particles:', ds.basename
+            print('Cannot plot particles:', ds.basename)
 
     if annotate_part_info:
         ad = ds.all_data()
@@ -139,7 +139,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
             else:
                 plot.annotate_grids(edgecolors="grey", linewidth=0.5, alpha=0.1)
         except:
-            print 'Cannot plot grids:', ds.basename
+            print('Cannot plot grids:', ds.basename)
 
 
     if markcenter:
