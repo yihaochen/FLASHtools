@@ -1,36 +1,40 @@
 #!/usr/bin/env python
-import pdb
 import os
 import sys
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 matplotlib.rcParams['font.family'] = 'stixgeneral'
 import matplotlib.pyplot as plt
 import yt
-from yt_synchrotron_emissivity import *
 yt.enable_parallelism()
-import logging
-logging.getLogger('yt').setLevel(logging.INFO)
-from yt.utilities.file_handler import HDF5FileHandler
-from yt.funcs import mylog
-from synchrotron.yt_synchrotron_emissivity import setup_part_file,\
-        synchrotron_file_name
+yt.mylog.setLevel('INFO')
+from synchrotron.yt_synchrotron_emissivity import\
+        setup_part_file,\
+        write_synchrotron_hdf5,\
+        synchrotron_file_name,\
+        StokesFieldName
 from scipy.ndimage import gaussian_filter
 
-dir = '/home/ychen/data/00only_0529_h1/'
+#dir = '/home/ychen/data/00only_0529_h1/'
+dir = '/d/d5/ychen/2015_production_runs/1022_h1_10Myr/'
 #dir = '/home/ychen/data/00only_0605_hinf/'
 #dir = '/home/ychen/data/00only_0605_h0/'
-gc = 32
 try:
     ind = int(sys.argv[1])
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%02d00' % ind), parallel=1, setup_function=setup_part_file)
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%03d0' % ind), parallel=1, setup_function=setup_part_file)
 except IndexError:
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_?[7-8]00'), parallel=2, setup_function=setup_part_file)
+    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_???0'), parallel=2, setup_function=setup_part_file)
 
 zoom_fac = 8
 
-proj_axis = 'x'
+proj_axis = [1,0,2]
+#proj_axis = 'x'
+nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]
+#nus = [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
+#nus = [(150, 'MHz'), (1400, 'MHz')]
 ptype = 'lobe'
+gc = 32
 maindir = os.path.join(dir, 'cos_synchrotron_QU_nn_%s/' % ptype)
 if proj_axis != 'x':
     maindir = os.path.join(maindir, '%i_%i_%i' % tuple(proj_axis))
@@ -45,37 +49,34 @@ for ds in ts.piter():
     if '0000' in ds.basename: continue
 
     projs, frb_I = {}, {}
-    #proj_axis = [0.5,0,1]
-    #nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
-    #nus = [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
-    nus = [(150, 'MHz'), (1.4, 'GHz')]
     for nu in nus:
         norm = yt.YTQuantity(*nu).in_units('GHz').value**0.5
 
-        ###########################################################################
-        ## Polarizations
-        ###########################################################################
-
-        #pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=None)
-        write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=8)
-
-        ds_sync = yt.load(synchrotron_file_name(ds, extend_cells=gc))
-        # Need to build the field list for the field_into
-        ds_sync.field_list
-        stokes = StokesFieldName(ptype, nu, proj_axis, field_type='flash')
-        for field in stokes.IQU:
-            ds_sync.field_info[field].units = 'Jy/cm/arcsec**2'
-            ds_sync.field_info[field].output_units = 'Jy/cm/arcsec**2'
-        width = ds_sync.domain_width[1:]/zoom_fac
-        #res = ds_sync.domain_dimensions[1:]*ds_sync.refine_by**ds_sync.index.max_level//zoom_fac//2
+        width = ds.domain_width[1:]/zoom_fac
+        #res = ds.domain_dimensions[1:]*ds.refine_by**ds.index.max_level//zoom_fac//2
         res = np.array([1200, 2400])
-        mylog.info('Making projection plots')
+        stokes = StokesFieldName(ptype, nu, proj_axis, field_type='flash')
+
+        #write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=32)
+        sync_fname = synchrotron_file_name(ds, extend_cells=gc)
+        if os.path.isfile(sync_fname):
+            ds_sync = yt.load(sync_fname)
+            # Need to build the field list for the field_into
+            ds_sync.field_list
+            for field in stokes.IQU:
+                ds_sync.field_info[field].units = 'Jy/cm/arcsec**2'
+                ds_sync.field_info[field].output_units = 'Jy/cm/arcsec**2'
+        else:
+        # We will calculate all things on the fly
+            pars = add_synchrotron_dtau_emissivity(ds, ptype=ptype, nu=nu, proj_axis=proj_axis, extend_cells=gc)
+            ds_sync = ds
+
+        yt.mylog.info('Making projection plots from file: %s', sync_fname)
         if proj_axis == 'x':
             plot = yt.ProjectionPlot(ds_sync, proj_axis, stokes.IQU, center=[0,0,0], width=width)
         else:
             plot = yt.OffAxisProjectionPlot(ds_sync, proj_axis, stokes.IQU, center=[0,0,0], width=width,
-                                        north_vector=[0,0,1])
-        #plot = yt.OffAxisProjectionPlot(ds, proj_axis, fields, center=[0,0,0], width=width, north_vector=[0,0,1])
+                                            north_vector=[0,0,1])
         plot.set_buff_size(res)
         plot.set_axes_unit('kpc')
 
@@ -135,7 +136,7 @@ for ds in ts.piter():
 
     if yt.is_root():
         sigma = 1
-        nu1, nu2 = nus
+        nu1, nu2 = nus[0], nus[-1]
         I1 = gaussian_filter(frb_I[nu1], sigma)
         I2 = gaussian_filter(frb_I[nu2], sigma)
         alpha = np.log10(I2/I1)/np.log10(1400/150)
@@ -168,9 +169,15 @@ for ds in ts.piter():
                     (0,1), xytext=(0.05, 0.96),  textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
         plt.tight_layout()
-        plt.savefig(spectral_index_dir+'/%s_proj_spectral_index.png' % ds.basename)
+        sifname = ds.basename
+        if proj_axis == 'x':
+            sifname += '_x_'
+        else:
+            sifname += '%i_%i_%i_' % tuple(proj_axis)
+        sifname += 'proj_speectral_index.png'
+        plt.savefig(os.path.join(spectral_index_dir, sifname))
 
     # Done with this dataset
-    mylog.info('Closing file: %s', ds)
+    yt.mylog.info('Closing file: %s', ds)
     ds.close()
     del projs
