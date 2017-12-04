@@ -36,14 +36,20 @@ def rescan(dir, printlist=False):
 
 def worker_fn(dirname, filepath):
     ds = yt.load(filepath)
-    factor = 4 if '10Myr' in dirname else 8
-    zlim = (ds.domain_left_edge[2]/factor, ds.domain_right_edge[2]/factor)
-    rlim = (0.0, ds.domain_right_edge[0]/factor)
+    kpc = yt.units.kpc.in_units('cm')
+    #zlim = (ds.domain_left_edge[2]/factor, ds.domain_right_edge[2]/factor)
+    #rlim = (0.0, ds.domain_right_edge[0]/factor)
 
-    #zlim = (0.0, ds.domain_right_edge[2]/8.0)
+    dx = ds.index.get_smallest_dx().in_units('cm')
+    # Assuming the jet is propagating at velocity slower than 15 kpc/Myr
+    zlim = max((15*ds.current_time.in_units('Myr').v*kpc)//dx, 100)*dx
+    zlims = (-zlim, zlim)
+    n_bins = int(2*zlim//dx)
+    rlim = (0.0, ds.domain_right_edge[0]/8.0)
+
     ad = ds.all_data()
-    prof = yt.create_profile(ad, 'z', ['jet '], logs={'z': False}, n_bins=2048, \
-                             weight_field='cell_mass', extrema={'z': zlim})
+    prof = yt.create_profile(ad, 'z', ['jet '], logs={'z': False}, n_bins=n_bins, \
+                             weight_field='cell_mass', extrema={'z': zlims})
     zmax = 0
     zmin = 0
     for (z, jet) in zip(reversed(prof.x), reversed(prof['jet '])):
