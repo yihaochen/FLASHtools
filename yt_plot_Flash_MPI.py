@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import matplotlib
 matplotlib.use('Agg')
+matplotlib.rcParams['font.family'] = 'stixgeneral'
 import yt
 import os
 import sys
-#sys.path.append(os.getenv('HOME') + '/lib/util')
 import util
 import MPI_taskpull2
 import logging
@@ -21,13 +21,13 @@ from synchrotron.yt_synchrotron_emissivity import setup_part_file
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
 dirs = ['./']
-regex = 'MHD_Jet*_hdf5_plt_cnt_0640'
+regex = 'data/MHD_Jet*_hdf5_plt_cnt_0630'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [8]
+zoom_facs = [12]
 proj_axes= ['x']
 figuredirtemplate = 'figures%s_zoom%i'
-ptypes = ['jet', 'jetp', 'lobe']
+ptypes = ['jetp', 'lobe']
 
 
 #annotate_particles = True if zoom_fac >= 2 else False
@@ -36,7 +36,7 @@ fields_part = ['velocity_y']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
-fields = ['particle_gamc', 'particle_nuc', 'particle_age']
+fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
 #fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
 
 
@@ -87,7 +87,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         #plot.set_cmap(cfield, 'algae')
         #plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
         #                        time_unit='Myr', text_args={'color':'k'})
-        filter = ad[ptype, 'particle_tag'] % 5 == 0
+        filter = ad[ptype, 'particle_tag'] % 2 == 0
 
         if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
 
@@ -100,7 +100,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
 
             if 'particle_gamc' in field:
                 fdata = np.log10(np.abs(gamc[filter]))
-                vmin=3; vmax=6; cmap='algae'
+                vmin=2; vmax=5; cmap='algae'
                 cblabel=u'log $\gamma_c$'
 
             elif 'particle_nuc' in field:
@@ -132,41 +132,49 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         if proj_axis == 'x':
             xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,12))
+            fig=plt.figure(figsize=(5,8))
             xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
             ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+            xlabel ='y'
+            ylabel ='z'
         elif proj_axis == 'y':
             xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
             fig=plt.figure(figsize=(12,6))
             xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
             ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+            xlabel ='z'
+            ylabel ='x'
         elif proj_axis == 'z':
             xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
             fig=plt.figure(figsize=(8,7))
             xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
             ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+            xlabel ='x'
+            ylabel ='y'
 
         ax=fig.add_subplot(111)
         ax.set_xlim(-xlim,xlim)
         ax.set_ylim(-ylim,ylim)
-        ax.set_xlabel('kpc')
-        ax.set_ylabel('kpc')
+        ax.set_xlabel(xlabel+' (kpc)')
+        ax.set_ylabel(ylabel+' (kpc)')
+        ax.set_aspect('equal', 'datalim')
         ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
                     (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
-        ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
-                    horizontalalignment='left', verticalalignment='center')
+        #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
+        #            horizontalalignment='left', verticalalignment='center')
 
-        sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
+        sc=ax.scatter(xaxis,yaxis,s=0.5,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
         try:
-            cb=plt.colorbar(sc)
+            cb=plt.colorbar(sc, fraction=0.10, pad=0, aspect=50)
+            cb.ax.tick_params(direction='in')
             cb.set_label(cblabel)
         except:
             pass
         plt.tight_layout()
-        plt.savefig(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip(),file.filename), dpi=150)
+        plt.savefig(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip(),file.filename+'.pdf'), dpi=150)
 
     else:
         plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
