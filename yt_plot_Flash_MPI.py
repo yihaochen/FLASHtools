@@ -14,13 +14,14 @@ import numpy as np
 
 from plotSlices import plotSliceField
 from plotProjections import plotProjectionField
-from particle_filters import *
+from particles.particle_filters import *
+from synchrotron.yt_synchrotron_emissivity import setup_part_file
 
 #dirs = ['/home/ychen/data/0only_1022_h1_10Myr']
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
-dirs = ['/home/ychen/data/0only_0529_h1']
-regex = 'MHD_Jet*_hdf5_plt_cnt_[0-1][0-9]00'
+dirs = ['./']
+regex = 'MHD_Jet*_hdf5_plt_cnt_0640'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
 zoom_facs = [8]
@@ -48,7 +49,8 @@ me = yt.utilities.physical_constants.mass_electron #9.109E-28
 c  = yt.utilities.physical_constants.speed_of_light #2.998E10
 
 def worker_fn(file, field, proj_axis, zoom_fac, ptype):
-    ds = yt.load(file.fullpath, particle_filename=file.fullpath.replace('plt_cnt', 'part')+'_updated')
+    ds = yt.load(file.fullpath)
+    setup_part_file(ds)
     ds.add_particle_filter(ptype)
     ds.periodicity = (True, True, True)
 
