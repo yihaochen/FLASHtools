@@ -16,23 +16,25 @@ from synchrotron.yt_synchrotron_emissivity import\
         StokesFieldName
 from scipy.ndimage import gaussian_filter
 
-#dir = '/home/ychen/data/00only_0529_h1/'
-dir = '/d/d5/ychen/2015_production_runs/1022_h1_10Myr/'
+dir = '/home/ychen/data/00only_0529_h1'
+#dir = '/d/d5/ychen/2015_production_runs/1022_h1_10Myr/'
 #dir = '/home/ychen/data/00only_0605_hinf/'
 #dir = '/home/ychen/data/00only_0605_h0/'
 try:
     ind = int(sys.argv[1])
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_%03d0' % ind), parallel=1, setup_function=setup_part_file)
+    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_%03d0' % ind), parallel=1, setup_function=setup_part_file)
 except IndexError:
-    ts = yt.DatasetSeries(os.path.join(dir,'*_hdf5_plt_cnt_???0'), parallel=2, setup_function=setup_part_file)
+    ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_???0'), parallel=2, setup_function=setup_part_file)
 
-zoom_fac = 8
+zoom_fac = 12
+format = 'pdf'
 
-proj_axis = [1,0,2]
-#proj_axis = 'x'
-nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]
+#proj_axis = [1,0,2]
+proj_axis = 'x'
+#nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]
 #nus = [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
 #nus = [(150, 'MHz'), (1400, 'MHz')]
+nus = [(150, 'MHz')]
 ptype = 'lobe'
 gc = 32
 maindir = os.path.join(dir, 'cos_synchrotron_QU_nn_%s/' % ptype)
@@ -57,7 +59,7 @@ for ds in ts.piter():
         res = np.array([1200, 2400])
         stokes = StokesFieldName(ptype, nu, proj_axis, field_type='flash')
 
-        #write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=32)
+        write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=32)
         sync_fname = synchrotron_file_name(ds, extend_cells=gc)
         if os.path.isfile(sync_fname):
             ds_sync = yt.load(sync_fname)
@@ -98,10 +100,14 @@ for ds in ts.piter():
 
         plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
                                 time_unit='Myr', draw_inset_box=True)
-        dirnamesplit = dir.split('_')
+        dirnamesplit = dir.strip('/').split('_')
         if dirnamesplit[-1] in ['h1','hinf', 'h0']:
-            x = 0.85
-            sim_name = dirnamesplit[-1]
+            if dirnamesplit[-1] == 'h1':
+                x = 0.80
+                sim_name = 'helical'
+            else:
+                x = 0.85
+                sim_name = dirnamesplit[-1]
         else:
             x = 0.80
             sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
@@ -114,7 +120,7 @@ for ds in ts.piter():
         #if pol in ['q', 'u']:
         #    plot.annotate_polline(frb_I, frb_Q, frb_U, factor=factor)
         if yt.is_root():
-            plot.save(maindir)
+            plot.save(maindir, suffix=format)
             projs[nu] = plot.data_source
 
             ###########################################################################
@@ -131,7 +137,7 @@ for ds in ts.piter():
             frb_U = plot.frb.data[stokes.U].v
             #plot.annotate_clear(index=-1)
             plot.annotate_polline(frb_I[nu], frb_Q, frb_U, factor=25, scale=15)
-            plot.save(polline)
+            plot.save(polline, suffix=format)
         ds_sync.close()
 
     if yt.is_root():
@@ -156,12 +162,17 @@ for ds in ts.piter():
         #projs[(1.4, 'GHz')].save_object('proj_1.4GHz', dir+'projs/'+ds.basename+'_projs.cpkl')
         #projs[(150, 'MHz')].save_object('proj_150MHz', dir+'projs/'+ds.basename+'_projs.cpkl')
 
-        dirnamesplit = dir.split('_')
+        dirnamesplit = dir.strip('/').split('_')
         if dirnamesplit[-1] in ['h1','hinf', 'h0']:
-            sim_name = dirnamesplit[-1]
+            if dirnamesplit[-1] == 'h1':
+                x = 0.80
+                sim_name = 'helical'
+            else:
+                x = 0.85
+                sim_name = dirnamesplit[-1]
         else:
+            x = 0.80
             sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
-        x = 0.80
         plt.annotate(sim_name, (1,1), xytext=(x, 0.96),  textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
 
@@ -174,8 +185,8 @@ for ds in ts.piter():
             sifname += '_x_'
         else:
             sifname += '%i_%i_%i_' % tuple(proj_axis)
-        sifname += 'proj_speectral_index.png'
-        plt.savefig(os.path.join(spectral_index_dir, sifname))
+        sifname += 'proj_spectral_index'
+        plt.savefig(os.path.join(spectral_index_dir, sifname), format=format)
 
     # Done with this dataset
     yt.mylog.info('Closing file: %s', ds)
