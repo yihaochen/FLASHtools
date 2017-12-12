@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import yt
+from yt.fields.field_detector import FieldDetector
 #yt.enable_parallelism()
-from tools import read_par, calcNozzleCoords
+from tools import calcNozzleCoords
 
 mu = 1.67E-24
 k = 1.38E-16
@@ -13,7 +14,7 @@ mag = 4.0E-5
 kpc = yt.units.kpc.in_units("cm")
 
 Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
-            'temperature': (1.0E0*T, 1.0E3*T), 'entropy': (2E1, 1E3),\
+            'temperature': (1.0E0*T, 1.0E3*T), 'entropy': (20, 60), 'entropy_ratio': (0.5, 2),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
             'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-v,v),\
             #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
@@ -34,7 +35,7 @@ logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'ism ': False, 'jet ': False, 'magp': True,\
              'eint': True, 'shok': False,\
              'density': True, 'pressure': True, \
-             'temperature': True, 'entropy': True,\
+             'temperature': True, 'entropy': False, 'entropy_ratio': True,\
              'velocity_x': False, 'velocity_y': False, 'velocity_z': False,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
              'velocity_magnitude':True,\
@@ -47,11 +48,42 @@ fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'je
 
 axis = {'x': 0, 'y':1, 'z':2}
 
+def _entropy_ratio(field, data):
+    from yt.units import g, cm, Kelvin
+    mH = yt.utilities.physical_constants.mass_hydrogen
+    k  = yt.utilities.physical_constants.boltzmann_constant
+
+    rhoCore = data.ds.parameters['sim_rhocore']*g/cm**3
+    rCore   = data.ds.parameters['sim_rcore']*cm
+    densitybeta = data.ds.parameters['sim_densitybeta']
+    Tout    = data.ds.parameters['sim_tout']*Kelvin
+    Tcore   = data.ds.parameters['sim_tcore']*Kelvin
+    rCoreT  = data.ds.parameters['sim_rcoret']*cm
+    gammaICM= data.ds.parameters['sim_gammaicm']
+    mu      = data.ds.parameters['sim_mu']
+
+    if not isinstance(data, FieldDetector):
+        data.set_field_parameter('center', (0,0,0))
+    r = data['index', 'spherical_radius']
+    mw = data.get_field_parameter("mu")
+    if mw is None: mw = 1.0
+    mw *= mH
+    density0 = rhoCore*(1.0 + (r/rCore)**2)**(-1.5*densitybeta)
+    T0 = Tout*(1.0+(r/rCoreT)**3)/(Tout/Tcore+(r/rCoreT)**3)
+
+    icm_entropy = k*T0*(density0/mw)**(-2./3.)
+
+    return data['entropy'].in_units('keV*cm**2')/icm_entropy.in_units('keV*cm**2')
+
 def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
                 zoom_fac=1, nozzleCoords=None, plotgrid=True, plotvelocity=False,\
                 markcenter=False, savepath=None, sim_name=None, width=None,\
                 show=False, annotate_particles=None, annotate_part_info=None,\
                 buff_size=(400,800)):
+    if field == 'entropy_ratio':
+        ds.add_field('entropy_ratio', function=_entropy_ratio,
+                display_name='Entropy Ratio', sampling_type='cell')
+
     plot = yt.SlicePlot(ds, proj_axis, field, center=center, width=width)
     if plotvelocity:
         scale=10*v
@@ -64,7 +96,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     plot.set_figure_size(10.24)
     #plot.set_font({'size': 36})
     plot.set_antialias(False)
-    plot.set_buff_size((2**12,2**12))
+    plot.set_buff_size((2**10,2**11))
 
     if field in ['ism ', 'jet ', 'shok']:
         plot.set_cmap(field, 'gist_heat')
@@ -73,10 +105,11 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     elif field in ['plasma_beta']:
         plot.set_cmap(field, 'algae_r')
     elif field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
-                'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp']:
+                'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp',\
+                'entropy_ratio']:
         plot.set_cmap(field, 'seismic')
     else:
-        plot.set_cmap(field, 'algae')
+        plot.set_cmap(field, 'viridis')
     #if field in ['magnetic_pressure'] and proj_axis=='x':
     #    plot.annotate_line_integral_convolution('magnetic_field_y', 'magnetic_field_z', lim=(0.4,0.65), cmap='binary', alpha=0.8)
 

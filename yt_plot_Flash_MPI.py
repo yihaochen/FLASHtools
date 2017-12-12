@@ -7,12 +7,11 @@ import os
 import sys
 import util
 import MPI_taskpull2
-import logging
-logging.getLogger('yt').setLevel(logging.ERROR)
 import matplotlib.pyplot as plt
 import numpy as np
+yt.mylog.setLevel('ERROR')
 
-from plotSlices import plotSliceField
+from plotSlices import plotSliceField, _entropy_ratio
 from plotProjections import plotProjectionField
 from particles.particle_filters import *
 from synchrotron.yt_synchrotron_emissivity import setup_part_file
@@ -20,14 +19,14 @@ from synchrotron.yt_synchrotron_emissivity import setup_part_file
 #dirs = ['/home/ychen/data/0only_1022_h1_10Myr']
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
-dirs = ['./']
-regex = 'data/MHD_Jet*_hdf5_plt_cnt_0630'
+dirs = ['./data/']
+regex = 'MHD_Jet*_hdf5_plt_cnt_???0'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [12]
+zoom_facs = [6]
 proj_axes= ['x']
 figuredirtemplate = 'figures%s_zoom%i'
-ptypes = ['jetp', 'lobe']
+ptypes = ['lobe']
 
 
 #annotate_particles = True if zoom_fac >= 2 else False
@@ -36,8 +35,8 @@ fields_part = ['velocity_y']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
-fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
 #fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
+fields = ['entropy_ratio']
 
 
 def rescan(dir, printlist=False):
@@ -52,7 +51,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
     ds = yt.load(file.fullpath)
     setup_part_file(ds)
     ds.add_particle_filter(ptype)
-    ds.periodicity = (True, True, True)
+    #ds.periodicity = (True, True, True)
 
     #nozzleCoords = calcNozzleCoords(ds, proj_axis)
     #nozzleCoords = None if proj_axis=='z' or zoom_fac<4 else nozzleCoords
