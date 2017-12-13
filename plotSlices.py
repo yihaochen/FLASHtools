@@ -14,7 +14,8 @@ mag = 4.0E-5
 kpc = yt.units.kpc.in_units("cm")
 
 Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
-            'temperature': (1.0E0*T, 1.0E3*T), 'entropy': (20, 60), 'entropy_ratio': (0.5, 2),\
+            'temperature': (3.0E0*T, 6.0E0*T), 'entropy': (20, 60),\
+            'temperature_ratio': (0.5, 2), 'entropy_ratio': (0.5, 2),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
             'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-v,v),\
             #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
@@ -35,7 +36,8 @@ logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'ism ': False, 'jet ': False, 'magp': True,\
              'eint': True, 'shok': False,\
              'density': True, 'pressure': True, \
-             'temperature': True, 'entropy': False, 'entropy_ratio': True,\
+             'temperature': True, 'entropy': False,\
+             'temperature_ratio': True, 'entropy_ratio': True,\
              'velocity_x': False, 'velocity_y': False, 'velocity_z': False,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
              'velocity_magnitude':True,\
@@ -47,6 +49,20 @@ fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'je
            'magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z', 'magnetic_pressure']
 
 axis = {'x': 0, 'y':1, 'z':2}
+
+def _temperature_ratio(field, data):
+    from yt.units import cm, Kelvin
+    Tout    = data.ds.parameters['sim_tout']*Kelvin
+    Tcore   = data.ds.parameters['sim_tcore']*Kelvin
+    rCoreT  = data.ds.parameters['sim_rcoret']*cm
+
+    if not isinstance(data, FieldDetector):
+        data.set_field_parameter('center', (0,0,0))
+    r = data['index', 'spherical_radius']
+    T0 = Tout*(1.0+(r/rCoreT)**3)/(Tout/Tcore+(r/rCoreT)**3)
+
+    return data['temperature']/T0
+
 
 def _entropy_ratio(field, data):
     from yt.units import g, cm, Kelvin
@@ -83,6 +99,9 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     if field == 'entropy_ratio':
         ds.add_field('entropy_ratio', function=_entropy_ratio,
                 display_name='Entropy Ratio', sampling_type='cell')
+    if field == 'temperature_ratio':
+        ds.add_field('temperature_ratio', function=_temperature_ratio,
+                display_name='Temperature Ratio', sampling_type='cell')
 
     plot = yt.SlicePlot(ds, proj_axis, field, center=center, width=width)
     if plotvelocity:
@@ -106,7 +125,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
         plot.set_cmap(field, 'algae_r')
     elif field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
                 'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp',\
-                'entropy_ratio']:
+                'temperature_ratio', 'entropy_ratio']:
         plot.set_cmap(field, 'seismic')
     else:
         plot.set_cmap(field, 'viridis')

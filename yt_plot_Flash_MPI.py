@@ -23,7 +23,7 @@ dirs = ['./data/']
 regex = 'MHD_Jet*_hdf5_plt_cnt_???0'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [6]
+zoom_facs = [8]
 proj_axes= ['x']
 figuredirtemplate = 'figures%s_zoom%i'
 ptypes = ['lobe']
@@ -36,7 +36,7 @@ fields_part = ['velocity_y']
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
 #fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
-fields = ['entropy_ratio']
+fields = ['temperature_ratio']
 
 
 def rescan(dir, printlist=False):
