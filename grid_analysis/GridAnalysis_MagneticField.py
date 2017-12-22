@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 import yt
 import numpy as np
-import matplotlib
-matplotlib.rcParams['savefig.dpi'] = 150
-import matplotlib.pyplot as plt
-import os
+import os.path as op
 import sys
-sys.path.append('/home/ychen/lib/util')
-import pickle
-import time
-import glob
-
 import util
+import MPI_taskpull2
+yt.mylog.setLevel('ERROR')
 
-yt.enable_parallelism()
 
-dirnames = [
+dirs = [
     '/home/ychen/data/0only_0529_h1',
     '/home/ychen/data/0only_1022_h1_10Myr',
     '/home/ychen/data/0only_0605_hinf',
@@ -24,75 +17,56 @@ dirnames = [
     '/home/ychen/data/0only_0204_h0_10Myr',
     ]
 
+regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 
-def get_Bs(fn):
-    #print fn
-    try:
-        ds = yt.load(fn)
-        ad = ds.all_data()
-        Btor = sum(ad['magnetic_field_toroidal']**2*ad['cell_volume'])/(8.0*np.pi)
-        Bpol = sum(ad['magnetic_field_poloidal']**2*ad['cell_volume'])/(8.0*np.pi)
-        Emag = sum(ad['magnetic_pressure']*ad['cell_volume'])
-        t = ds.current_time
-        return t.in_units('s'), Btor.in_units('erg'), \
-               Bpol.in_units('erg'), Emag.in_units('erg')
-    except:
-        print 'Error!'
-        raise Exception
+def rescan(dir, printlist=False):
+    files = util.scan_files(dir, regex=regex, walk=True, reverse=False)
+    return files
 
-def get_Bflux(ds):
-    ad = ds.all_data()
-    Btor_flux = np.sum(ad['magnetic_field_toroidal']*(ad['dx']*ad['dy']))
-    Bx_flux = np.sum(ad['magnetic_field_x']*ad['dy']*ad['dz'])
-    By_flux = np.sum(ad['magnetic_field_y']*ad['dx']*ad['dz'])
-    Bz_flux = np.sum(ad['magnetic_field_z']*ad['dx']*ad['dy'])
-    t = ds.current_time
-    return t.in_units('s'), Btor_flux.in_units('gauss*cm**2'),\
-           Bx_flux.in_units('gauss*cm**2'), By_flux.in_units('gauss*cm**2'), Bz_flux.in_units('gauss*cm**2')
-    #except:
-    #    print 'Error!'
-    #    raise Exception
+def worker_fn(dirname, filepath):
+    ds = yt.load(filepath)
+    kpc = yt.units.kpc.in_units('cm')
+    leftedge =  [-100*kpc, -100*kpc, -100*kpc]
+    rightedge = [ 100*kpc,  100*kpc,  100*kpc]
+    box = ds.box(leftedge, rightedge)
+    #EBtor = sum(box['magnetic_field_toroidal']**2*box['cell_volume'])/(8.0*np.pi)
+    #EBpol = sum(box['magnetic_field_poloidal']**2*box['cell_volume'])/(8.0*np.pi)
+    Emag  = sum(box['magnetic_pressure']*box['cell_volume'])
 
-def get_mags(dirname, parallel=1):
-    #files = rescan(dirname, True)
-    #Btors, Bpols, Emags = [], [], []
-    #fnames = [f.fullpath for f in files[1:-1:5]]
-    #print [fn.split('_')[-1] for fn in fnames]
-    #if parallel:
-    #    pool = multiprocessing.Pool(8)
-    #print fnames
-    #    result = pool.map(func, fnames)
-    #else:
-    #    result = map(func, fnames)
-    storage = {}
+    return int(ds.basename[-4:]), ds.current_time.in_units('Myr'),\
+            Emag.in_units('erg')
+#            EBtor.in_units('erg'), EBpol.in_units('erg'), 
 
-    fnames = os.path.join(dirname,'*_hdf5_plt_cnt_???0')
-    ts = yt.DatasetSeries(fnames, parallel=parallel)
-    for sto, ds in ts.piter(storage=storage):
-        sto.result = get_Bflux(ds)
-        sto.result_id = str(ds)
+def tasks_gen(dirs):
+    for dir in dirs:
+        files = rescan(dir)
+        for file in reversed(files[:]):
+            yield file.pathname, file.fullpath
 
-    return storage
+tasks = tasks_gen(dirs)
 
+results = MPI_taskpull2.taskpull(worker_fn, tasks, print_result=True)
 
+if results:
+    collected = {}
+    for key, item in results.items():
+        dirname, fname = key
+        if 'data' in dirname:
+            dirname = op.dirname(dirname) + '/'
+        if dirname in collected:
+            collected[dirname].append(item)
+        else:
+            collected[dirname] = [item]
+    for key, item in collected.items():
+        collected[key] = sorted(item)
+    #print collected
 
-#files = glob.glob("Bflux_table_*.pickle")
-#if files:
-#    with open(files[-1], 'r') as f:
-#        results = pickle.load(f)
-#else:
-#    results = {}
-results = {}
+    #picklename = time.strftime("Bflux_table_%Y%m%d_%H%M%S.pickle")
+    #pickle.dump(collected, open( picklename, "wb" ))
 
-t0 = time.time()
-for dirname in dirnames:
-    if dirname in results:
-        next
-    else:
-        results[dirname] = get_mags(dirname, parallel=32)
-        print 'Elapsed time:', time.time() - t0
-        t0 = time.time()
-
-picklename = time.strftime("Bflux_table_%Y%m%d_%H%M%S.pickle")
-pickle.dump(results, open( picklename, "wb" ))
-
+    fmt = '%04d %6.3f %e'# %e %e'
+    #header = 'filenumber, t(Myr), EBtor(erg), EBpol(erg), Emag(erg)'
+    header = 'filenumber, t(Myr), Emag(erg)'
+    for dirname in collected.keys():
+        #print np.asarray(collected[dirname])
+        np.savetxt(dirname+'/GridAnalysis_MagneticFields.txt', np.asarray(collected[dirname]), fmt=fmt, header=header)
