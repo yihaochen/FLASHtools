@@ -12,12 +12,12 @@ yt.mylog.setLevel('INFO')
 from synchrotron.yt_synchrotron_emissivity import\
         setup_part_file,\
         write_synchrotron_hdf5,\
-        synchrotron_file_name,\
+        synchrotron_filename,\
         StokesFieldName
 from scipy.ndimage import gaussian_filter
 
-dir = '/home/ychen/data/00only_0529_h1'
-#dir = '/d/d5/ychen/2015_production_runs/1022_h1_10Myr/'
+#dir = '/home/ychen/data/00only_0529_h1'
+dir = '/d/d5/ychen/2015_production_runs/1022_h1_10Myr/'
 #dir = '/home/ychen/data/00only_0605_hinf/'
 #dir = '/home/ychen/data/00only_0605_h0/'
 try:
@@ -26,15 +26,15 @@ try:
 except IndexError:
     ts = yt.DatasetSeries(os.path.join(dir,'data/*_hdf5_plt_cnt_???0'), parallel=2, setup_function=setup_part_file)
 
-zoom_fac = 12
-format = 'pdf'
+zoom_fac = 8
+format = 'png'
 
 #proj_axis = [1,0,2]
 proj_axis = 'x'
 #nus = [(150, 'MHz'), (233, 'MHz'), (325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]
 #nus = [(325, 'MHz'), (610, 'MHz'), (1400, 'MHz')]:
 #nus = [(150, 'MHz'), (1400, 'MHz')]
-nus = [(150, 'MHz')]
+nus = [(100, 'MHz')]
 ptype = 'lobe'
 gc = 32
 maindir = os.path.join(dir, 'cos_synchrotron_QU_nn_%s/' % ptype)
@@ -60,7 +60,7 @@ for ds in ts.piter():
         stokes = StokesFieldName(ptype, nu, proj_axis, field_type='flash')
 
         write_synchrotron_hdf5(ds, ptype, nu, proj_axis, extend_cells=32)
-        sync_fname = synchrotron_file_name(ds, extend_cells=gc)
+        sync_fname = synchrotron_filename(ds, extend_cells=gc)
         if os.path.isfile(sync_fname):
             ds_sync = yt.load(sync_fname)
             # Need to build the field list for the field_into
