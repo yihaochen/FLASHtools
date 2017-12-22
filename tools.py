@@ -188,3 +188,28 @@ def calcDen0(data, ptype='io'):
                ( 0.5*R*R*(1.+1./M**2/(g-1.)) + R*bf*(0.3125+1./M**2/(g-1.)) + bf*bf*(0.06056+0.29736/M**2/(g-1.)) )
 
     return den0
+
+def setup_cl(dirs):
+    # Set up colors and label names
+    colors = {}
+    labels = {}
+    for dirname in dirs:
+        if 'M3_h1' in dirname:
+            colors[dirname] = 'pink'
+            labels[dirname] = 'low Mach (3)'
+        elif 'h1' in dirname:
+            colors[dirname] = 'r'   #'#fc8d62'
+            labels[dirname] = 'helical'
+        elif 'h0' in dirname:
+            colors[dirname] = 'b'   #'#8da0cb'
+            labels[dirname] = 'poloidal'
+        elif 'hinf' in dirname:
+            colors[dirname] = 'g'   #'#66c2a5'
+            labels[dirname] = 'toroidal'
+        elif 'hydro' in dirname:
+            colors[dirname] = 'k'
+            labels[dirname] = 'hydro'
+        elif 'M24_b01' in dirname:
+            colors[dirname] = 'purple'
+            labels[dirname] = 'low beta (0.01)'
+    return colors, labels
