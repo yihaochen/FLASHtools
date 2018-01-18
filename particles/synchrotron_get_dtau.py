@@ -52,8 +52,17 @@ else:
 
         val = h5f['tracer particles']
 
+        n_sync_particles = val.value.shape[0]
+
+        if 'type' in colname:
+            itype = colname.index('type')
+            mask = val.value[:,itype] == 1.0
+            n_sync_particles = sum(mask)
+        else:
+            mask = True
+
         # Go through the list of particles
-        for part in val.value:
+        for part in val.value[mask,:]:
             # Skip this particle if already recorded
             if (part[tag], part[tadd]) in particles_leave:
                 continue
@@ -67,8 +76,8 @@ else:
                 # Make sure we have positive density and tau (There might be a better way to do this...)
                 if part[dens] > 0.0 and part[tau] > 0.0:
                     particles_leave[(part[tag], part[tadd])] = [part[field] for field in fields] + [sim_time]
-        print(f.filename, len(particles_leave), val.value.shape[0])
-        if len(particles_leave) == val.value.shape[0]:
+        print(f.filename, len(particles_leave), n_sync_particles)
+        if len(particles_leave) > 0 and len(particles_leave) == n_sync_particles:
             break
 
 
@@ -102,7 +111,14 @@ for f in files[:]:
     ivelz = colname.index('velz')
     itau  = colname.index('tau')
     ishok = colname.index('shok')
-    tp = h5f['tracer particles'].value
+    if 'type' in colname:
+        itype = colname.index('type')
+        itype = colname.index('type')
+        mask = val.value[:,itype] == 1.0
+    else:
+        mask = True
+
+    tp = h5f['tracer particles'].value[mask,:]
 
     dtau = np.zeros(tp.shape[0])
     den1 = tp[:,iden0]
