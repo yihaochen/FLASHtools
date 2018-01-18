@@ -179,7 +179,7 @@ def calcDen0(data, ptype='io'):
     M = initM+(M-initM)*np.cos(0.5*np.pi*np.clip((tadd-t1)/t1, -1.0, 0.0))
 
     # New simulations in 2016 has 'particle_type' field
-    if data.has_key('particle_type'):
+    if data.has_key((ptype, 'particle_type')):
         den0 = 0.5*p['sim_powerjet']/np.pi/p['sim_veljet']**3/( R*R*(0.5+x/M**2/g) + R*bf*(0.3125+x/M**2/g)\
                              + bf*bf*(0.06056+0.29736*x/M**2/g) )
     # For simulations in 2015 (did not include magnetic power)
