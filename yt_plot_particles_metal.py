@@ -10,17 +10,13 @@ import logging
 logging.getLogger('yt').setLevel(logging.ERROR)
 import matplotlib.pyplot as plt
 import numpy as np
-
-def metal(pfilter, data):
-    filter = (data[("all", "particle_type")] == 2.0)
-    return filter
-
-yt.add_particle_filter("metal", function=metal, filtered_type='all', requires=["particle_type"])
+from particles.particle_filters import *
 
 dir = './'
-regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0,5]0'
+regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9]0'
 files = None
-figuredir = 'particles_metal/y_z_r0'
+figuredir = 'particles_metal/'
+field = 'y_z_r0'
 
 
 def rescan(printlist=False):
@@ -28,7 +24,7 @@ def rescan(printlist=False):
     return files
 
 # Load the inital file to identify the inital locations of the metal particles
-f0 =  './MHD_Jet_hdf5_plt_cnt_0000'
+f0 =  util.scan_files(dir, regex='MHD_Jet*_hdf5_plt_cnt_0000', walk=True)[0].fullpath
 ds = yt.load(f0)
 ds.add_particle_filter("metal")
 ad = ds.all_data()
@@ -37,7 +33,7 @@ rr0 = ad[('metal','particle_position_spherical_radius')].in_units('kpc')[arr]
 
 # Filter the central slab
 xx=ad[('metal', 'particle_posx')].in_units('kpc')[arr]
-filtr = np.abs(xx)<30
+filtr = np.abs(xx)<30 if field == 'y_z_r0' else True
 
 def worker_fn(file):
     ds = yt.load(file.fullpath)
@@ -49,16 +45,41 @@ def worker_fn(file):
     zz=ad[('metal', 'particle_posz')].in_units('kpc')[arr]
 
     plt.figure(figsize=(6,5))
-    sc=plt.scatter(yy[filtr][::3], zz[filtr][::3], c=rr0[filtr][::3], s=1, lw=0.0, vmax=80, vmin=0, cmap='gnuplot2_r', alpha=0.9)
-    cb=plt.colorbar(sc)
-    cb.set_label('initial r (kpc)')
-    plt.xlim(-60,60)
-    plt.ylim(-60,60)
-    plt.xlabel('y (kpc)')
-    plt.ylabel('z (kpc)')
+    if field == 'y_z_r0':
+        sc=plt.scatter(yy[filtr][::3], zz[filtr][::3], c=rr0[filtr][::3], s=1, lw=0.0, vmax=80, vmin=0, cmap='gnuplot2_r', alpha=0.9)
+        cb=plt.colorbar(sc)
+        cb.set_label('initial r (kpc)')
+        plt.xlim(-50,50)
+        plt.ylim(-50,50)
+        plt.xlabel('y (kpc)')
+        plt.ylabel('z (kpc)')
+    elif field == 'r0_r':
+        rr = ad[('metal','particle_position_spherical_radius')].in_units('kpc')[arr]
+        rcyl = ad[('metal', 'particle_position_cylindrical_radius')].in_units('kpc')[arr]
+        sc = plt.scatter(rr0[filtr][::3], rr[filtr][::3], c=rcyl[filtr][::3], s=1, lw=0.0, vmax=40, vmin=0)
+        rline = np.linspace(0,100)
+        plt.plot(rline, rline, ':', c='k', alpha=0.5)
+        plt.xlim(0,100)
+        plt.ylim(0,100)
+        plt.xlabel('initial r (kpc)')
+        plt.ylabel('r (kpc)')
+    elif field == 'r0_dr':
+        rr = ad[('metal','particle_position_spherical_radius')].in_units('kpc')[arr]
+        rcyl = ad[('metal', 'particle_position_cylindrical_radius')].in_units('kpc')[arr]
+        dr = rr-rr0
+        sc = plt.scatter(rr0[filtr][::3], dr[filtr][::3], c=rcyl[filtr][::3], s=1, lw=0.0, vmax=40, vmin=0)
+        plt.hlines(0, 0, 100, linestyles=':', alpha=0.5)
+        plt.xlim(0,100)
+        plt.ylim(-5,60)
+        plt.xlabel('initial r (kpc)')
+        plt.ylabel(r'$\Delta$ r (kpc)')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(dir,figuredir,file.filename), dpi=150)
+    if file.pathname.split('/')[-1] == 'data':
+        absfiguredir = os.path.join(os.path.dirname(file.pathname), figuredir)
+    else:
+        absfiguredir = os.path.join(file.pathname, figuredir)
+    plt.savefig(os.path.join(absfiguredir,field,file.filename), dpi=150)
 
     return ds.basename[-4: ]
 
@@ -73,6 +94,8 @@ def tasks_gen(i0):
 def init():
     if not os.path.exists(os.path.join(dir,figuredir)):
         os.mkdir(os.path.join(dir, figuredir))
+    if not os.path.exists(os.path.join(dir,figuredir,field)):
+        os.mkdir(os.path.join(dir,figuredir,field))
 
 i0 = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 tasks = tasks_gen(i0)
