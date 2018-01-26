@@ -8,6 +8,7 @@ import sys
 import util
 import MPI_taskpull2
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 yt.mylog.setLevel('ERROR')
 
@@ -19,12 +20,12 @@ from synchrotron.yt_synchrotron_emissivity import setup_part_file
 #dirs = ['/home/ychen/data/0only_1022_h1_10Myr']
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
-dirs = ['./data/']
-regex = 'MHD_Jet*_hdf5_plt_cnt_???0'
+dirs = ['./']
+regex = 'MHD_Jet*_hdf5_plt_cnt_????'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [8]
-proj_axes= ['x']
+zoom_facs = [4]
+proj_axes= ['y']
 figuredirtemplate = 'figures%s_zoom%i'
 ptypes = ['lobe']
 
@@ -35,12 +36,12 @@ fields_part = ['velocity_y']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
-#fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
-fields = ['temperature_ratio']
+fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
+#fields += ['temperature_ratio', 'entropy_ratio']
 
 
 def rescan(dir, printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=False, printlist=printlist, reverse=False)
+    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=False)
     return files
 
 e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu
@@ -61,12 +62,20 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
              else ['velocity_z', 'density']
     axis = '_%s' % proj_axis if proj_axis != 'x' else ''
     figuredir = figuredirtemplate % (axis, zoom_fac)
+    if file.pathname.split('/')[-1] == 'data':
+        absfiguredir = os.path.join(os.path.dirname(file.pathname), figuredir)
+    else:
+        absfiguredir = os.path.join(file.pathname, figuredir)
 
     #plotProjectionField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
     #               plotgrid=fields_grid, plotvelocity=fields_velocity, nozzleCoords=nozzleCoords, \
     #               annotate_particles=fields_part,annotate_part_info=False,\
     #               savepath=os.path.join(dir,figuredir,field))
-    dirnamesplit = os.path.abspath(file.pathname).split('_')
+    if file.pathname.split('/')[-1] == 'data':
+        dirnamesplit = os.path.abspath(os.path.dirname(file.pathname)).split('_')
+    else:
+        dirnamesplit = os.path.abspath(file.pathname).split('_')
+
     if dirnamesplit[-1] in ['h1','hinf', 'h0'] and dirnamesplit[-2] in ['b1']:
         sim_name = dirnamesplit[-1]
     else:
@@ -86,7 +95,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         #plot.set_cmap(cfield, 'algae')
         #plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
         #                        time_unit='Myr', text_args={'color':'k'})
-        filter = ad[ptype, 'particle_tag'] % 2 == 0
+        filter = ad[ptype, 'particle_tag'] % 5 == 0
 
         if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
 
@@ -99,7 +108,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
 
             if 'particle_gamc' in field:
                 fdata = np.log10(np.abs(gamc[filter]))
-                vmin=2; vmax=5; cmap='algae'
+                vmin=3; vmax=5; cmap='algae'
                 cblabel=u'log $\gamma_c$'
 
             elif 'particle_nuc' in field:
@@ -109,8 +118,8 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
                 B = ad.apply_units(B, 'gauss')
                 # Cutoff frequency
                 fdata = np.log10(3.0*gamc[filter]**2*e*B/(4.0*np.pi*me*c))
-                vmin=7.5; vmax=12; cmap='algae'
-                cblabel=u'log $\\nu_c$'
+                vmin=7; vmax=10; cmap='algae'
+                cblabel=u'cutoff frequency $\\nu_c$'
 
             if 'dtau' in field:
                 cblabel=cblabel+' (dtau)'
@@ -131,7 +140,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         if proj_axis == 'x':
             xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(5,8))
+            fig=plt.figure(figsize=(4,7))
             xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
             ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
             xlabel ='y'
@@ -139,7 +148,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         elif proj_axis == 'y':
             xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(12,6))
+            fig=plt.figure(figsize=(8,4))
             xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
             ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
             xlabel ='z'
@@ -154,32 +163,35 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
             ylabel ='y'
 
         ax=fig.add_subplot(111)
+        sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.5)
         ax.set_xlim(-xlim,xlim)
         ax.set_ylim(-ylim,ylim)
         ax.set_xlabel(xlabel+' (kpc)')
         ax.set_ylabel(ylabel+' (kpc)')
-        ax.set_aspect('equal', 'datalim')
+        ax.set_aspect('equal', adjustable='box')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", "5%", pad=0)
+        cb=plt.colorbar(sc, cax=cax)
+        cb.ax.tick_params(direction='in')
+        cb.set_label(cblabel)
+        if 'particle_nuc' in field:
+            cb.set_ticks([7,8,9,10])
+            cb.set_ticklabels(['10 MHz', '100 MHz', '1 GHz', '10 GHz'])
         ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
                     (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
                     horizontalalignment='left', verticalalignment='center')
         #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
         #            horizontalalignment='left', verticalalignment='center')
 
-        sc=ax.scatter(xaxis,yaxis,s=0.5,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
-        try:
-            cb=plt.colorbar(sc, fraction=0.10, pad=0, aspect=50)
-            cb.ax.tick_params(direction='in')
-            cb.set_label(cblabel)
-        except:
-            pass
         plt.tight_layout()
-        plt.savefig(os.path.join(file.pathname,figuredir,ptype+'_'+field.strip(),file.filename+'.pdf'), dpi=150)
+        plt.savefig(os.path.join(absfiguredir,ptype+'_'+field.strip(),file.filename+'.png'),\
+                dpi=200, bbox_inches='tight')
 
     else:
         plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
                    plotgrid=fields_grid, plotvelocity=fields_velocity, \
                    annotate_particles=fields_part,annotate_part_info=False, sim_name=sim_name,\
-                   savepath=os.path.join(file.pathname,figuredir,field.strip()))
+                   savepath=os.path.join(absfiguredir,field.strip()))
     return sim_name, ds.basename[-4: ], field
 
 
