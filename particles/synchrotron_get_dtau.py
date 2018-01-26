@@ -113,12 +113,8 @@ for f in files[:]:
     ishok = colname.index('shok')
     if 'type' in colname:
         itype = colname.index('type')
-        itype = colname.index('type')
-        mask = val.value[:,itype] == 1.0
-    else:
-        mask = True
 
-    tp = h5f['tracer particles'].value[mask,:]
+    tp = h5f['tracer particles'].value
 
     dtau = np.zeros(tp.shape[0])
     den1 = tp[:,iden0]
@@ -129,7 +125,8 @@ for f in files[:]:
             tau1 = read[(tag, tadd)][3]
             dtau[i] = max(tp[i,itau]-tau1, 1E-100)
         except KeyError:
-            print('tag: %6i, tadd: %9.3e, velz: %9.2e, shok: %1i not in pickled data' % (tag, tadd, tp[i,ivelz], tp[i,ishok]))
+            if 'type' not in colname or tp[i,itype] == 1.0:
+                print('tag: %6i, tadd: %9.3e, velz: %9.2e, shok: %1i not in pickled data' % (tag, tadd, tp[i,ivelz], tp[i,ishok]))
         except:
             print(den1[i])
             print(read)
