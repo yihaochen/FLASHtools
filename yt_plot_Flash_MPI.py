@@ -36,8 +36,7 @@ fields_part = ['velocity_y']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
-fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
-#fields += ['temperature_ratio', 'entropy_ratio']
+fields += ['temperature_ratio', 'entropy_ratio']
 
 
 def rescan(dir, printlist=False):
@@ -81,117 +80,11 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
     else:
         sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
 
-    if 'particle' in field:
-        ad = ds.all_data()
-        #if proj_axis == 'x':
-        #    xfield = (ptype, 'particle_position_y')
-        #    yfield = (ptype, 'particle_position_z')
-        #else:
-        #    raise ValueError
-        #cfield = (ptype, field)
-        #plot = yt.ParticlePlot(ds, xfield, yfield, cfield)
-        #plot.zoom(zoom_fac)
-        #plot.set_zlim(cfield, 1E2, 1E5)
-        #plot.set_cmap(cfield, 'algae')
-        #plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
-        #                        time_unit='Myr', text_args={'color':'k'})
-        filter = ad[ptype, 'particle_tag'] % 5 == 0
+    plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
+               plotgrid=fields_grid, plotvelocity=fields_velocity, \
+               annotate_particles=fields_part,annotate_part_info=False, sim_name=sim_name,\
+               savepath=os.path.join(absfiguredir,field.strip()))
 
-        if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
-
-            if 'dtau' in field:
-                gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den1'])**(1./3.) \
-                       / ad[ptype, 'particle_dtau']
-            else:
-                gamc = ad[ptype, 'particle_gamc']
-
-
-            if 'particle_gamc' in field:
-                fdata = np.log10(np.abs(gamc[filter]))
-                vmin=3; vmax=5; cmap='algae'
-                cblabel=u'log $\gamma_c$'
-
-            elif 'particle_nuc' in field:
-                B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
-                           +ad[(ptype, 'particle_magy')][filter]**2
-                           +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
-                B = ad.apply_units(B, 'gauss')
-                # Cutoff frequency
-                fdata = np.log10(3.0*gamc[filter]**2*e*B/(4.0*np.pi*me*c))
-                vmin=7; vmax=10; cmap='algae'
-                cblabel=u'cutoff frequency $\\nu_c$'
-
-            if 'dtau' in field:
-                cblabel=cblabel+' (dtau)'
-
-        elif field == 'particle_age':
-            fdata = (ds.current_time.v - ad[ptype, 'particle_tadd'][filter])/ds.current_time.v
-            vmin=0; vmax=1; cmap='algae_r'
-            cblabel='normalized age'
-        elif field == 'particle_magp':
-            magp = (ad[(ptype, 'particle_magx')][filter]**2
-                   +ad[(ptype, 'particle_magy')][filter]**2
-                   +ad[(ptype, 'particle_magz')][filter]**2)/2
-            magp = ad.apply_units(magp, 'erg/cm**3')
-            fdata = np.log10(magp)
-            vmin=-12; vmax=-10; cmap='algae'
-            cblabel=u'log$P_B$'
-
-        if proj_axis == 'x':
-            xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(4,7))
-            xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            xlabel ='y'
-            ylabel ='z'
-        elif proj_axis == 'y':
-            xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,4))
-            xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-            xlabel ='z'
-            ylabel ='x'
-        elif proj_axis == 'z':
-            xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,7))
-            xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-            xlabel ='x'
-            ylabel ='y'
-
-        ax=fig.add_subplot(111)
-        sc=ax.scatter(xaxis,yaxis,s=1,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.5)
-        ax.set_xlim(-xlim,xlim)
-        ax.set_ylim(-ylim,ylim)
-        ax.set_xlabel(xlabel+' (kpc)')
-        ax.set_ylabel(ylabel+' (kpc)')
-        ax.set_aspect('equal', adjustable='box')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", "5%", pad=0)
-        cb=plt.colorbar(sc, cax=cax)
-        cb.ax.tick_params(direction='in')
-        cb.set_label(cblabel)
-        if 'particle_nuc' in field:
-            cb.set_ticks([7,8,9,10])
-            cb.set_ticklabels(['10 MHz', '100 MHz', '1 GHz', '10 GHz'])
-        ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
-                    (1,0), xytext=(0.05, 0.96),  textcoords='axes fraction',\
-                    horizontalalignment='left', verticalalignment='center')
-        #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
-        #            horizontalalignment='left', verticalalignment='center')
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(absfiguredir,ptype+'_'+field.strip(),file.filename+'.png'),\
-                dpi=200, bbox_inches='tight')
-
-    else:
-        plotSliceField(ds, zoom_fac=zoom_fac, center=center, proj_axis=proj_axis, field=field,\
-                   plotgrid=fields_grid, plotvelocity=fields_velocity, \
-                   annotate_particles=fields_part,annotate_part_info=False, sim_name=sim_name,\
-                   savepath=os.path.join(absfiguredir,field.strip()))
     return sim_name, ds.basename[-4: ], field
 
 

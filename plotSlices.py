@@ -112,7 +112,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
                 plot.annotate_velocity(100, scale=scale)
         else:
             plot.annotate_velocity(100, scale=scale)
-    plot.set_figure_size(10.24)
+    plot.set_figure_size(10)
     #plot.set_font({'size': 36})
     plot.set_antialias(False)
     plot.set_buff_size((2**10,2**11))
@@ -139,7 +139,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
                             time_unit='Myr', draw_inset_box=True)
     if sim_name:
-        plot.annotate_text((0.85, 0.95), sim_name, coord_system='axis',
+        plot.annotate_text((0.85, 0.90), sim_name, coord_system='axis',
                            text_args={'color':'k'})
     if annotate_particles:
         try:
@@ -208,7 +208,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
         #    plot.annotate_marker(pos, marker='o', plot_args={'color':'white',\
         #                         'edgecolor':'black', 's':(1.0+size)*zoom_fac*4})
     if savepath:
-        plot.save(savepath)#, mpl_kwargs={'dpi':128})
+        plot.save(savepath, mpl_kwargs={'dpi':200})
     #else:
     #    plot.save(os.getcwd())
     if show:
