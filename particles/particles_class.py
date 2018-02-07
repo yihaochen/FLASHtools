@@ -1,12 +1,11 @@
 import numpy as np
 import util
 import matplotlib
-matplotlib.rcParams['savefig.dpi'] = 150
+matplotlib.use('Agg')
+matplotlib.rcParams['figure.dpi'] = 150
 import matplotlib.pyplot as plt
 import h5py
 import yt
-import logging
-logging.getLogger('yt').setLevel(logging.ERROR)
 
 me = yt.utilities.physical_constants.mass_electron.v
 c  = yt.utilities.physical_constants.speed_of_light.v
@@ -17,8 +16,9 @@ _fields_list = [
 #    'tag', 'tadd', 'den0',
     'posx', 'posy', 'posz',
     'velx', 'vely', 'velz',
-    'dens', 'gamc', 'tau',
     'magx', 'magy', 'magz',
+    'dens', 'gamc',
+    'tau',  'dtau',
     'shok'
 ]
 
@@ -47,7 +47,7 @@ def find_part_indices(h5file, tags, tadds):
     Find the indices of the particles matching tadds and tags. Return None if not found.
     """
     tp = h5file['tracer particles']
-    colname = [item[0].strip() for item in h5file['particle names']]
+    colname = [item[0].decode().strip() for item in h5file['particle names']]
     itadd = colname.index('tadd')
     itag = colname.index('tag')
 
@@ -56,7 +56,9 @@ def find_part_indices(h5file, tags, tadds):
 
     indices_temp = np.where(np.logical_and(masks_tadd, masks_tag))[0]
 
-    assert len(indices_temp) <= len(tags)
+    # Make sure we find the same number of particles as we have
+    assert len(indices_temp) <= len(tags),\
+           'len(indices_temp) = %i, len(tags) = %i' % (len(indices_temp), len(tags))
 
     indices = [None]*len(tags)
 
@@ -73,6 +75,7 @@ class Particle():
         self.tadd = tadd
         self.tag = tag
         self.den0 = -1
+        self.den1 = -1
         self.time = []
         #nfiles = len(partfiles)
         self.grid_fields = grid_fields
@@ -85,17 +88,20 @@ class Particle():
             setattr(self, field, [])
 
     def read_from_h5file(self, ind, h5file, ds=None):
-        colname = [item[0].strip() for item in h5file['particle names']]
+        colname = [item[0].decode().strip() for item in h5file['particle names']]
         findices = {f: colname.index(f) for f in _fields_list}
         # If the supplied particle is found in this particle file
         if ind:
             self.time.append( h5file['real scalars'].value[0][1]/Myr )
             tp = h5file['tracer particles']
-            # Assign den0 for the first time and make sure den0 are the same
+            # Assign den0 and den1 for the first time and make sure den0 are the same
             if self.den0 < 0:
                 self.den0 = tp[ind, colname.index('den0')]
+                self.den1 = tp[ind, colname.index('den1')]
             else:
+            # Compare den0 and den1 otherwise
                 assert self.den0 == tp[ind, colname.index('den0')]
+                assert self.den1 == tp[ind, colname.index('den1')]
 
             for field in _fields_list:
                 getattr(self, field).append( tp[ind,findices[field]] )
@@ -105,16 +111,19 @@ class Particle():
                     #print ds, grid_field, pos
                     getattr(self, grid_field).append(ds.find_field_values_at_point(grid_field, pos)[0])
 
-    def append(self, other_particle):
+    def add(self, other_particle):
         assert self.tadd == other_particle.tadd
         assert self.tag == other_particle.tag
         self.time.extend(other_particle.time)
+        if self.den0 < 0 and other_particle.den0 > 0:
+            self.den0 = other_particle.den0
+            self.den1 = other_particle.den1
 
         for field in _fields_list + self.grid_fields:
             getattr(self, field).extend( getattr(other_particle, field) )
 
 
-class Particles(Particle):
+class Particles():
     def __init__(self, tags, tadds, grid_fields=[]):
         assert len(tadds) == len(tags)
         self.tags = tags
@@ -123,7 +132,7 @@ class Particles(Particle):
         self.grid_fields = grid_fields
 
         # Initialize the particle
-        self.data = [Particle((tag,tadd), grid_fields=grid_fields) for tag, tadd in zip(tags, tadds)]
+        self.data = [Particle(tag, tadd, grid_fields=grid_fields) for tag, tadd in zip(tags, tadds)]
 
     def __getitem__(self, key):
         return self.data[key]
@@ -157,5 +166,5 @@ class Particles(Particle):
 
     def combine(self, other_particles):
         for i, other_part in enumerate(other_particles.data):
-            self.data[i].append(other_part)
+            self.data[i].add(other_part)
 
