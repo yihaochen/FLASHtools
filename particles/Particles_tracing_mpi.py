@@ -153,7 +153,7 @@ def plot_particle_tracing(part, timerange='alltime'):
 
     #################### Cutoff Gamma ################
     plt.plot(part.time, np.log10(part.gamc), ':', c='c', label=u'log $\\gamma_{c}$', alpha=0.3)
-    gamc_dtau = (part.dens/part.den1)**(1./3.)/part.dtau
+    gamc_dtau = (part.dens/part.den0)**(1./3.)/part.dtau
     plt.plot(part.time, np.log10(gamc_dtau), '-', c='c', label=u'log $\\gamma_{c}$ (dtau)')
 
 

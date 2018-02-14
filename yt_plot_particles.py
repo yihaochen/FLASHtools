@@ -26,7 +26,7 @@ figuredirtemplate = 'figures%s_zoom%i'
 ptypes = ['jetp']
 
 fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
-#fields = ['particle_den1']
+fields += ['particle_den1']
 
 
 def rescan(dir, printlist=False):
@@ -59,12 +59,12 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
 
     if 'particle' in field:
         ad = ds.all_data()
-        filter = ad[ptype, 'particle_position_y'] < 0.5*yt.units.kpc.in_units('cm')
+        filter = ad[ptype, 'particle_position_y'] < 0.24*yt.units.kpc.in_units('cm')
 
         if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
 
             if 'dtau' in field:
-                gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den1'])**(1./3.) \
+                gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den0'])**(1./3.) \
                        / ad[ptype, 'particle_dtau']
             else:
                 gamc = ad[ptype, 'particle_gamc']
@@ -103,7 +103,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         elif field == 'particle_den1':
             fdata = np.log10(ad[(ptype, 'particle_den1')][filter])
             vmin=-27; vmax=-25; cmap='arbre'
-            clabel=u'density when leaving jet $\\rho_1 (g/cm^3)$'
+            cblabel=u'density when leaving jet $\\rho_1$ (g/cm$^3$)'
 
         if proj_axis == 'x':
             xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
@@ -131,7 +131,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
             ylabel ='y'
 
         ax=fig.add_subplot(111)
-        sc=ax.scatter(xaxis,yaxis,s=2,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.6)
+        sc=ax.scatter(xaxis,yaxis,s=1.5,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.6)
         ax.set_xlim(-0,xlim)
         ax.set_ylim(-ylim,ylim)
         ax.set_xlabel(xlabel+' (kpc)')
@@ -154,6 +154,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         plt.tight_layout()
         plt.savefig(os.path.join(absfiguredir,ptype+'_'+field.strip(),file.filename+'.png'),\
                 dpi=200, bbox_inches='tight')
+        plt.close(fig)
 
     return sim_name, ds.basename[-12:-8], field
 
