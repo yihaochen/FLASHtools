@@ -16,7 +16,7 @@ dir = './'
 regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9]0'
 files = None
 figuredir = 'particles_metal/'
-field = 'y_z_r0'
+field = 'dr_hist'
 
 
 def rescan(printlist=False):
@@ -73,6 +73,31 @@ def worker_fn(file):
         plt.ylim(-5,60)
         plt.xlabel('initial r (kpc)')
         plt.ylabel(r'$\Delta$ r (kpc)')
+    elif field == 'dr_hist':
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        rr = ad[('metal','particle_position_spherical_radius')].in_units('kpc')[arr]
+        drr = rr - rr0
+        fig = plt.figure(figsize=(5,7))
+
+        ax = fig.add_subplot(111)
+
+        divider = make_axes_locatable(ax)
+        ax2 = divider.append_axes("bottom", 1.3, pad=0.1, sharex=ax)
+
+        for rlim in [(0,30), (30,60), (60,90)]:
+            mask = np.logical_and(rr0 > rlim[0], rr0 < rlim[1])
+            ax.scatter(drr[mask], rr0[mask], s=1, lw=0)
+
+            null = ax2.hist(drr[mask], bins=65, range=(-5, 60),
+                            normed=True, histtype='step',
+                            label=r'%2i < $r_0$ < %2i' % rlim, alpha=0.9, log=True)
+        ax.text(45, 85, '%.1f Myr' % ds.current_time.in_units('Myr'))
+        ax.set_xlim(-5, 60)
+        ax.set_ylim(0, 90)
+        ax.set_ylabel(r'initial radius $r_0$ (kpc)')
+        ax2.legend(loc=1)
+        ax2.set_xlabel(r'$\Delta r$ (kpc)')
+        ax2.set_ylim(1E-5, 1E0)
 
     plt.tight_layout()
     if file.pathname.split('/')[-1] == 'data':
