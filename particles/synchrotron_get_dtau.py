@@ -4,11 +4,13 @@ import pickle
 import h5py
 import numpy as np
 import os
+from collections import defaultdict
 #dir = '/home/ychen/d9/FLASH4/2015_production_runs/0529_L45_M10_b1_h1/'
 dir = './data/'
 
 force_overwrite = False
-pickle_path = os.path.join(dir, 'particles_leave_dict.pickle')
+pickle_path = os.path.join(dir, 'particles_leave_dict_peak.pickle')
+
 
 # Read the pickle file if it already exists
 if os.path.exists(pickle_path):
@@ -27,11 +29,13 @@ else:
         return files
     files = rescan(True)
 
+    v_jet = 3E9
     # Velocity threshold
-    v_thres = 0.05*3E10
+    v_thres = (0.8*v_jet, 0.2*v_jet)
 
     # Particles that leave the jet
     particles_leave = {}
+    particles_decelerate = defaultdict(list)
 
     for f in files[:]:
         h5f = h5py.File(f.fullpath, 'r')
@@ -47,9 +51,6 @@ else:
 
         sim_time = h5f['real scalars'][0][1]
 
-        # Fields to be written in the output file
-        fields = [tadd, tag, dens, tau]
-
         val = h5f['tracer particles']
 
         n_sync_particles = val.value.shape[0]
@@ -58,11 +59,12 @@ else:
             itype = colname.index('type')
             mask = val.value[:,itype] == 1.0
             n_sync_particles = sum(mask)
+            particles = val.value[mask,:]
         else:
-            mask = True
+            particles = val.value
 
         # Go through the list of particles
-        for part in val.value[mask,:]:
+        for part in particles:
             # Skip this particle if already recorded
             if (part[tag], part[tadd]) in particles_leave:
                 continue
@@ -71,13 +73,15 @@ else:
             vz = part[velz]
             vel_magnitude = np.sqrt(vx*vx+vy*vy+vz*vz)
 
-            # Record new particles that just leave the jet
-            if vel_magnitude < v_thres:
-                # Make sure we have positive density and tau (There might be a better way to do this...)
-                if part[dens] > 0.0 and part[tau] > 0.0:
-                    particles_leave[(part[tag], part[tadd])] = [part[field] for field in fields] + [sim_time]
+            # Record new particles that begin to decelerate
+            if vel_magnitude < v_thres[0]:
+                particles_decelerate[(part[tag], part[tadd])].append([ sim_time, vel_magnitude, part[dens], part[tau] ])
+            if vel_magnitude < v_thres[1]:
+                arg = np.argmax(np.array(particles_decelerate[(part[tag], part[tadd])])[:,2])
+                particles_leave[(part[tag], part[tadd])] = particles_decelerate.pop((part[tag], part[tadd]))[arg]
         print(f.filename, len(particles_leave), n_sync_particles)
-        if len(particles_leave) > 0 and len(particles_leave) == n_sync_particles:
+        if len(particles_leave) > 2 and len(particles_leave) == n_sync_particles:
+            print('Particle number reached, breaking loop')
             break
 
 
