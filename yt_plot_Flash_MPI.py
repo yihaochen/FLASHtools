@@ -36,11 +36,11 @@ fields_part = ['velocity_y']
 #fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
 #          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
 #          'plasma_beta', 'entropy', 'particle_gamc']
-fields += ['temperature_ratio', 'entropy_ratio']
-
+#fields += ['temperature_ratio', 'entropy_ratio']
+fields = ['radial_velocity']
 
 def rescan(dir, printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=False)
+    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=True)
     return files
 
 e  = yt.utilities.physical_constants.elementary_charge #4.803E-10 esu

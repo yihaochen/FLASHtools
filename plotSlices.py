@@ -4,6 +4,7 @@ import yt
 from yt.fields.field_detector import FieldDetector
 #yt.enable_parallelism()
 from tools import calcNozzleCoords
+from collections import defaultdict
 
 mu = 1.67E-24
 k = 1.38E-16
@@ -13,17 +14,19 @@ mag = 4.0E-5
 
 kpc = yt.units.kpc.in_units("cm")
 
-Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
-            'temperature': (3.0E0*T, 6.0E0*T), 'entropy': (20, 60),\
+fieldunit = {'radial_velocity': 'km/s'}
+
+extrema = { 'density': (1.0E-3*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
+            'temperature': (3.0E0*T, 7.0E0*T), 'entropy': (20, 200),\
             'temperature_ratio': (0.5, 2), 'entropy_ratio': (0.5, 2),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
             'velocity_x':(-0.3333*v,0.3333*v), 'velocity_y': (-0.3333*v,0.3333*v), 'velocity_z':(-v,v),\
             #'velocity_x':(-0.1*v,0.1*v), 'velocity_y': (-1.0E7,1.0E7), 'velocity_z':(-1.0E5,1.0e5),\
-            'velocity_magnitude':(1.0E3, 1.0E7),\
+            'velocity_magnitude':(1.0E3, 1.0E7),'radial_velocity':(-1E3, 1E3),\
             'velocity_para':(-v,v), 'velocity_perp':(-0.05*v, 0.05*v), 'mach':(0.0, 30.0),\
             'plasma_beta':(1E-1, 1E3),\
             'shok': (0.0, 10.0),\
-            'ism ': (0.0, 1.0), 'jet ': (0.0, 1.0), 'magnetic_pressure': (1.0E-4*mag*mag, 1.0E-1*mag*mag),\
+            'ism ': (0.0, 1.0), 'jet ': (1E-5, 1E0), 'magnetic_pressure': (1.0E-4*mag*mag, 1.0E-1*mag*mag),\
             'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
             'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
             'velx': (-v,v), 'vely': (-v,v), 'velz':(-v,v),\
@@ -33,17 +36,23 @@ Extrema = { 'density': (1.0E-4*mu, 1.0E-1*mu), 'pressure':(1.0E-12, 1.0E-8),\
 logfield = { 'dens': True, 'pres': True, 'temp': True,\
              'velx': False, 'vely': False, 'velz': False,\
              'magx': False, 'magy': False, 'magz': False,\
-             'ism ': False, 'jet ': False, 'magp': True,\
+             'ism ': False, 'jet ': True, 'magp': True,\
              'eint': True, 'shok': False,\
              'density': True, 'pressure': True, \
              'temperature': True, 'entropy': False,\
              'temperature_ratio': True, 'entropy_ratio': True,\
              'velocity_x': False, 'velocity_y': False, 'velocity_z': False,\
              'velocity_para':False, 'velocity_perp':False, 'mach': False,\
-             'velocity_magnitude':True,\
+             'velocity_magnitude':True, 'radial_velocity': True,\
              'magnetic_field_x': False, 'magnetic_field_y': False, 'magnetic_field_z': False,\
              'magnetic_pressure': True,\
              'plasma_beta': True}
+
+
+linthresh = defaultdict()
+for field, log in logfield.items():
+    if log == True and extrema[field][0] < 0:
+        linthresh[field] = extrema[field][1]/100
 
 fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
            'magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z', 'magnetic_pressure']
@@ -125,15 +134,17 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
         plot.set_cmap(field, 'algae_r')
     elif field in ['magnetic_field_x', 'magnetic_field_y', 'magnetic_field_z',\
                 'velocity_x', 'velocity_y', 'velocity_z', 'velocity_para', 'velocity_perp',\
-                'temperature_ratio', 'entropy_ratio']:
+                'temperature_ratio', 'entropy_ratio', 'radial_velocity']:
         plot.set_cmap(field, 'seismic')
     else:
         plot.set_cmap(field, 'viridis')
     #if field in ['magnetic_pressure'] and proj_axis=='x':
     #    plot.annotate_line_integral_convolution('magnetic_field_y', 'magnetic_field_z', lim=(0.4,0.65), cmap='binary', alpha=0.8)
+    if field in fieldunit:
+        plot.set_unit(field, fieldunit[field])
 
-    plot.set_log(field, logfield[field])
-    mi, ma = Extrema[field]
+    plot.set_log(field, logfield[field], linthresh=linthresh[field])
+    mi, ma = extrema[field]
     plot.set_zlim(field, mi, ma)
     plot.zoom(zoom_fac)
     plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
