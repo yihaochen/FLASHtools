@@ -17,16 +17,16 @@ from particles.particle_filters import *
 from synchrotron.yt_synchrotron_emissivity import setup_part_file
 
 dirs = ['./']
-regex = '*hdf5_part_[0-9][0-9][0-9][0-9]_updated'
-#regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
+regex = '*hdf5_part_[0-9][0-9][0-9][0-9]_updated_peak'
+#regex = '*hdf5_part_[0-9][0-9][0,5]0_updated_peak'
 files = None
-zoom_facs = [8]
+zoom_facs = [4]
 proj_axes= ['y']
 figuredirtemplate = 'figures%s_zoom%i'
 ptypes = ['jetp']
 
 fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
-fields += ['particle_den1']
+#fields += ['particle_den1']
 
 
 def rescan(dir, printlist=False):
@@ -59,13 +59,14 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
 
     if 'particle' in field:
         ad = ds.all_data()
-        filter = ad[ptype, 'particle_position_y'] < 0.24*yt.units.kpc.in_units('cm')
+        #filter = ad[ptype, 'particle_position_y'] < 0.24*yt.units.kpc.in_units('cm')
+        filter = ad[ptype, 'particle_tag'] % 5 == 0
 
         if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
 
             if 'dtau' in field:
                 gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den0'])**(1./3.) \
-                       / ad[ptype, 'particle_dtau']
+                       / (ad[ptype, 'particle_dtau']+1E-100)
             else:
                 gamc = ad[ptype, 'particle_gamc']
 
@@ -106,6 +107,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
             cblabel=u'density when leaving jet $\\rho_1$ (g/cm$^3$)'
 
         if proj_axis == 'x':
+            sort = np.argsort(ad[ptype, 'particle_position_x'][filter])
             xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
             fig=plt.figure(figsize=(4,7))
@@ -114,14 +116,16 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
             xlabel ='y'
             ylabel ='z'
         elif proj_axis == 'y':
+            sort = np.argsort(ad[ptype, 'particle_position_y'][filter])
             xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
             fig=plt.figure(figsize=(10,6))
             xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            ylim=15*yt.units.kpc
+            ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/4.0
             xlabel ='z'
             ylabel ='x'
         elif proj_axis == 'z':
+            sort = np.argsort(ad[ptype, 'particle_position_z'][filter])
             xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
             yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
             fig=plt.figure(figsize=(8,7))
@@ -131,7 +135,9 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
             ylabel ='y'
 
         ax=fig.add_subplot(111)
-        sc=ax.scatter(xaxis,yaxis,s=1.5,c=fdata,linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.6)
+        sizes = np.clip((-np.log10(ad[ptype, 'particle_dens'][filter]) - 25)*3, 0.5, 5)
+        sc=ax.scatter(xaxis[sort],yaxis[sort],s=sizes[sort],c=fdata[sort],linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.7)
+        ax.set_facecolor('k')
         ax.set_xlim(-0,xlim)
         ax.set_ylim(-ylim,ylim)
         ax.set_xlabel(xlabel+' (kpc)')
@@ -145,9 +151,9 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         if 'particle_nuc' in field:
             cb.set_ticks([7,8,9,10])
             cb.set_ticklabels(['10 MHz', '100 MHz', '1 GHz', '10 GHz'])
-        ax.annotate('%6.3f Myr' % (float(ds.current_time)/3.15569E13),\
-                    (1,0), xytext=(0.05, 0.9),  textcoords='axes fraction',\
-                    horizontalalignment='left', verticalalignment='center')
+        ax.text(0.03, 0.90, '%6.2f Myr' % (float(ds.current_time)/3.15569E13),
+                horizontalalignment='left', verticalalignment='center',
+                color='grey', transform=ax.transAxes)
         #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
         #            horizontalalignment='left', verticalalignment='center')
 
@@ -156,7 +162,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
                 dpi=200, bbox_inches='tight')
         plt.close(fig)
 
-    return sim_name, ds.basename[-12:-8], field
+    return sim_name, ds.basename.rstrip('updated_peak')[-4:], field
 
 
 def tasks_gen(dirs, i0, fields, proj_axes, zoom_facs, ptypes):
@@ -166,7 +172,7 @@ def tasks_gen(dirs, i0, fields, proj_axes, zoom_facs, ptypes):
         for ptype in ptypes:
             for zoom_fac in zoom_facs:
                 for proj_axis in proj_axes:
-                    for file in files:
+                    for file in reversed(files):
                         for field in fields:
                             yield file, field, proj_axis, zoom_fac, ptype
 

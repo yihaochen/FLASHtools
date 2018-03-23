@@ -104,9 +104,9 @@ files = rescan(True)
 ################################################################################
 for f in files[:]:
     h5f  = h5py.File(f.fullpath, 'r')
-    if os.path.isfile(f.fullpath+'_updated') and not force_overwrite:
+    if os.path.isfile(f.fullpath+'_updated_peak') and not force_overwrite:
         continue
-    h5fr = h5py.File(f.fullpath+'_updated', 'w')
+    h5fr = h5py.File(f.fullpath+'_updated_peak', 'w')
 
     colname = [item[0].decode().strip() for item in h5f['particle names']]
     itag  = colname.index('tag')
