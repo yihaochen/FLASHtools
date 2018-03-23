@@ -67,7 +67,7 @@ if results:
     collected = {}
     for key, item in results.items():
         dirname, fname = key
-        if 'data' in dirname:
+        if dirname.split('/')[-1] == 'data:
             dirname = op.dirname(dirname) + '/'
         if dirname in collected:
             collected[dirname].append(item)
