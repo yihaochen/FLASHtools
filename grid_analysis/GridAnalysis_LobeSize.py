@@ -11,10 +11,10 @@ import logging
 logging.getLogger('yt').setLevel(logging.ERROR)
 
 # Scan for files
-dirs = ['/home/ychen/data/0only_0330_h0_nojiggle',\
-        '/home/ychen/data/0only_0518_hydro_nojiggle',\
-        '/home/ychen/data/0only_0314_h1_nojiggle',\
-        '/home/ychen/data/0only_0525_hinf_nojiggle']
+#dirs = ['/home/ychen/data/0only_0330_h0_nojiggle',\
+#        '/home/ychen/data/0only_0518_hydro_nojiggle',\
+#        '/home/ychen/data/0only_0314_h1_nojiggle',\
+#        '/home/ychen/data/0only_0525_hinf_nojiggle']
 #dirs = ['/home/ychen/data/0only_1106_M3_h1',\
 #        '/home/ychen/data/0only_1204_M24_b01',\
 #        '/home/ychen/data/0only_1110_h0_rerun']
@@ -23,8 +23,8 @@ dirs = ['/home/ychen/data/0only_0330_h0_nojiggle',\
 #        '/home/ychen/data/0only_0605_hinf/',\
 #        '/home/ychen/data/0only_0602_hydro/']
 
-#dirs = ['/home/ychen/data/0only_1022_h1_10Myr/',\
-#        '/home/ychen/data/0only_0204_h0_10Myr/',\
+dirs = ['/home/ychen/data/0only_1022_h1_10Myr/',\
+        '/home/ychen/data/0only_1212_h0_10Myr_rerun/']
 #        '/home/ychen/data/0only_0204_hinf_10Myr/',\
 #        '/home/ychen/data/0only_0413_hydro_10Myr/']
 
@@ -110,7 +110,7 @@ if results:
     collected = {}
     for key, item in results.items():
         dirname, fname = key
-        if 'restart' in dirname:
+        if dirname.split('/')[-1] == 'data':
             dirname = op.dirname(dirname) + '/'
         if dirname in collected:
             collected[dirname].append(item)
