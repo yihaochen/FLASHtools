@@ -21,10 +21,10 @@ from synchrotron.yt_synchrotron_emissivity import setup_part_file
 #dirs = ['/home/ychen/data/0only_0204_hinf_10Myr',\
 #        '/home/ychen/data/0only_0204_h0_10Myr']
 dirs = ['./']
-regex = 'MHD_Jet*_hdf5_plt_cnt_????'
+regex = '*_hdf5_plt_cnt_????'
 #regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 files = None
-zoom_facs = [4]
+zoom_facs = [2]
 proj_axes= ['y']
 figuredirtemplate = 'figures%s_zoom%i'
 ptypes = ['lobe']
@@ -32,12 +32,11 @@ ptypes = ['lobe']
 
 #annotate_particles = True if zoom_fac >= 2 else False
 fields_velocity = None
-fields_part = ['velocity_y']
-#fields = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'jet ',\
-#          'magnetic_field_x', 'magnetic_field_z', 'magnetic_pressure',\
-#          'plasma_beta', 'entropy', 'particle_gamc']
+fields_part = ['velocity_x', 'velocity_z']
+fields = ['density', 'pressure', 'temperature', 'velocity_x', 'velocity_z', 'jet ',\
+          'magnetic_field_y', 'magnetic_field_z', 'magnetic_pressure']
 #fields += ['temperature_ratio', 'entropy_ratio']
-fields = ['radial_velocity']
+#fields = ['density', 'shks']
 
 def rescan(dir, printlist=False):
     files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist, reverse=True)
@@ -58,7 +57,7 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
     nozzleCoords = None
     center = (0.0,0.0,7.714E22) if proj_axis=='z' else (0.0,0.0,0.0)
     fields_grid = ['density', 'pressure', 'velocity_y', 'velocity_z'] if zoom_fac >=16 \
-             else ['velocity_z', 'density']
+             else ['velocity_z', 'density', 'shks']
     axis = '_%s' % proj_axis if proj_axis != 'x' else ''
     figuredir = figuredirtemplate % (axis, zoom_fac)
     if file.pathname.split('/')[-1] == 'data':

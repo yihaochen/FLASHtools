@@ -17,15 +17,18 @@ from particles.particle_filters import *
 from synchrotron.yt_synchrotron_emissivity import setup_part_file
 
 dirs = ['./']
-regex = '*hdf5_part_[0-9][0-9][0-9][0-9]_updated_peak'
+#regex = '*hdf5_part_[0-9][0-9][0-9][0-9]_updated_peak'
+regex = '*hdf5_part_[0-9][0-9][0-9][0-9]'
 #regex = '*hdf5_part_[0-9][0-9][0,5]0_updated_peak'
 files = None
-zoom_facs = [4]
+zoom_facs = [2]
 proj_axes= ['y']
 figuredirtemplate = 'figures%s_zoom%i'
-ptypes = ['jetp']
+ptypes = ['jet', 'shok']
 
-fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
+#fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
+fields = ['particle_shks', 'particle_gamc']
+fields +=['particle_ind1', 'particle_tau1']
 #fields += ['particle_den1']
 
 
@@ -57,110 +60,125 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
     else:
         sim_name = dirnamesplit[-2] + '_' + dirnamesplit[-1]
 
-    if 'particle' in field:
-        ad = ds.all_data()
-        #filter = ad[ptype, 'particle_position_y'] < 0.24*yt.units.kpc.in_units('cm')
-        filter = ad[ptype, 'particle_tag'] % 5 == 0
+    ad = ds.all_data()
+    filter = np.abs(ad[ptype, 'particle_position_y']) < 0.5*yt.units.kpc.in_units('cm')
+    #filter = ad[ptype, 'particle_position_y'] < 0.5*yt.units.kpc.in_units('cm')
+    #filter = ad[ptype, 'particle_tag'] % 5 == 0
 
-        if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
+    if field in ['particle_gamc_dtau', 'particle_nuc_dtau', 'particle_gamc', 'particle_nuc']:
 
-            if 'dtau' in field:
-                gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den0'])**(1./3.) \
-                       / (ad[ptype, 'particle_dtau']+1E-100)
-            else:
-                gamc = ad[ptype, 'particle_gamc']
+        if 'dtau' in field:
+            gamc = (ad[ptype, 'particle_dens']/ad[ptype, 'particle_den0'])**(1./3.) \
+                   / (ad[ptype, 'particle_dtau']+1E-100)
+        else:
+            gamc = ad[ptype, 'particle_gamc']
 
 
-            if 'particle_gamc' in field:
-                fdata = np.log10(np.abs(gamc[filter]))
-                vmin=2.5; vmax=4; cmap='arbre'
-                cblabel=u'log $\gamma_c$'
+        if 'particle_gamc' in field:
+            fdata = np.log10(np.abs(gamc[filter]))
+            #vmin=2.5; vmax=4; cmap='arbre'
+            vmin=3; vmax=8; cmap='arbre'
+            cblabel=u'log $\gamma_c$'
 
-            elif 'particle_nuc' in field:
-                B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
-                           +ad[(ptype, 'particle_magy')][filter]**2
-                           +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
-                B = ad.apply_units(B, 'gauss')
-                # Cutoff frequency
-                fdata = np.log10(3.0*gamc[filter]**2*e*B/(4.0*np.pi*me*c))
-                vmin=7; vmax=10; cmap='arbre'
-                cblabel=u'cutoff frequency $\\nu_c$'
+        elif 'particle_nuc' in field:
+            B = np.sqrt(ad[(ptype, 'particle_magx')][filter]**2
+                       +ad[(ptype, 'particle_magy')][filter]**2
+                       +ad[(ptype, 'particle_magz')][filter]**2)*np.sqrt(4.0*np.pi)
+            B = ad.apply_units(B, 'gauss')
+            # Cutoff frequency
+            fdata = np.log10(3.0*gamc[filter]**2*e*B/(4.0*np.pi*me*c))
+            vmin=7; vmax=10; cmap='arbre'
+            cblabel=u'cutoff frequency $\\nu_c$'
 
-            if 'dtau' in field:
-                cblabel=cblabel+' (dtau)'
+        if 'dtau' in field:
+            cblabel=cblabel+' (dtau)'
 
-        elif field == 'particle_age':
-            fdata = (ds.current_time.v - ad[ptype, 'particle_tadd'][filter])/ds.current_time.v
-            vmin=0; vmax=1; cmap='arbre_r'
-            cblabel='normalized age'
-        elif field == 'particle_magp':
-            magp = (ad[(ptype, 'particle_magx')][filter]**2
-                   +ad[(ptype, 'particle_magy')][filter]**2
-                   +ad[(ptype, 'particle_magz')][filter]**2)/2
-            magp = ad.apply_units(magp, 'erg/cm**3')
-            fdata = np.log10(magp)
-            vmin=-12; vmax=-10; cmap='arbre'
-            cblabel=u'log$P_B$'
-        elif field == 'particle_den1':
-            fdata = np.log10(ad[(ptype, 'particle_den1')][filter])
-            vmin=-27; vmax=-25; cmap='arbre'
-            cblabel=u'density when leaving jet $\\rho_1$ (g/cm$^3$)'
+    elif field == 'particle_age':
+        fdata = (ds.current_time.v - ad[ptype, 'particle_tadd'][filter])/ds.current_time.v
+        vmin=0; vmax=1; cmap='arbre_r'
+        cblabel='normalized age'
+    elif field == 'particle_magp':
+        magp = (ad[(ptype, 'particle_magx')][filter]**2
+               +ad[(ptype, 'particle_magy')][filter]**2
+               +ad[(ptype, 'particle_magz')][filter]**2)/2
+        magp = ad.apply_units(magp, 'erg/cm**3')
+        fdata = np.log10(magp)
+        vmin=-12; vmax=-10; cmap='arbre'
+        cblabel=u'log$P_B$'
+    elif field == 'particle_den1':
+        fdata = np.log10(ad[(ptype, 'particle_den1')][filter])
+        vmin=-27; vmax=-25; cmap='arbre'
+        cblabel=u'density when leaving jet $\\rho_1$ (g/cm$^3$)'
+    elif field == 'particle_shks':
+        fdata = ad[(ptype, 'particle_shks')][filter]
+        vmin=1; vmax=8; cmap='jet'
+        cblabel=u'shks compr ratio'
+    elif field == 'particle_ind1':
+        fdata = ad[(ptype, 'particle_ind1')][filter]
+        vmin=1; vmax=3; cmap='jet'
+        cblabel=u'power-law index'
+    elif field == 'particle_tau1':
+        fdata = np.log10(ad[(ptype, 'particle_tau1')][filter])
+        vmin=-8; vmax=-4; cmap='arbre_r'
+        cblabel=r'$log \tau$'
 
-        if proj_axis == 'x':
-            sort = np.argsort(ad[ptype, 'particle_position_x'][filter])
-            xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(4,7))
-            xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            xlabel ='y'
-            ylabel ='z'
-        elif proj_axis == 'y':
-            sort = np.argsort(ad[ptype, 'particle_position_y'][filter])
-            xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(10,6))
-            xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/4.0
-            xlabel ='z'
-            ylabel ='x'
-        elif proj_axis == 'z':
-            sort = np.argsort(ad[ptype, 'particle_position_z'][filter])
-            xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
-            yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
-            fig=plt.figure(figsize=(8,7))
-            xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
-            ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
-            xlabel ='x'
-            ylabel ='y'
+    if proj_axis == 'x':
+        sort = np.argsort(ad[ptype, 'particle_position_x'][filter])
+        xaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
+        yaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
+        fig=plt.figure(figsize=(4,7))
+        xlim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+        ylim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+        xlabel ='y'
+        ylabel ='z'
+    elif proj_axis == 'y':
+        sort = np.argsort(ad[ptype, 'particle_position_y'][filter])
+        xaxis = ad[ptype, 'particle_position_z'][filter]/3.08567758E21
+        yaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
+        fig=plt.figure(figsize=(10,6))
+        xlim=ds.domain_width[2].in_units('kpc')/zoom_fac/2.0
+        ylim=ds.domain_width[0].in_units('kpc')/zoom_fac/4.0
+        xlabel ='z'
+        ylabel ='x'
+    elif proj_axis == 'z':
+        sort = np.argsort(ad[ptype, 'particle_position_z'][filter])
+        xaxis = ad[ptype, 'particle_position_x'][filter]/3.08567758E21
+        yaxis = ad[ptype, 'particle_position_y'][filter]/3.08567758E21
+        fig=plt.figure(figsize=(8,7))
+        xlim=ds.domain_width[0].in_units('kpc')/zoom_fac/2.0
+        ylim=ds.domain_width[1].in_units('kpc')/zoom_fac/2.0
+        xlabel ='x'
+        ylabel ='y'
 
-        ax=fig.add_subplot(111)
-        sizes = np.clip((-np.log10(ad[ptype, 'particle_dens'][filter]) - 25)*3, 0.5, 5)
-        sc=ax.scatter(xaxis[sort],yaxis[sort],s=sizes[sort],c=fdata[sort],linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.7)
-        ax.set_facecolor('k')
-        ax.set_xlim(-0,xlim)
-        ax.set_ylim(-ylim,ylim)
-        ax.set_xlabel(xlabel+' (kpc)')
-        ax.set_ylabel(ylabel+' (kpc)')
-        ax.set_aspect('equal', adjustable='box')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", 0.2, pad=0)
-        cb=plt.colorbar(sc, cax=cax)
-        cb.ax.tick_params(direction='in')
-        cb.set_label(cblabel)
-        if 'particle_nuc' in field:
-            cb.set_ticks([7,8,9,10])
-            cb.set_ticklabels(['10 MHz', '100 MHz', '1 GHz', '10 GHz'])
-        ax.text(0.03, 0.90, '%6.2f Myr' % (float(ds.current_time)/3.15569E13),
-                horizontalalignment='left', verticalalignment='center',
-                color='grey', transform=ax.transAxes)
-        #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
-        #            horizontalalignment='left', verticalalignment='center')
+    ax=fig.add_subplot(111)
+    sizes = np.clip((-np.log10(ad[ptype, 'particle_dens'][filter]) - 25)*2, 0.5, 3)
+    sc=ax.scatter(xaxis[sort],yaxis[sort],s=sizes[sort],c=fdata[sort],linewidth=0,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.7)
+    ax.set_facecolor('dimgray')
+    ax.set_xlim(-0,xlim)
+    ax.set_ylim(-ylim,ylim)
+    ax.set_xlabel(xlabel+' (kpc)')
+    ax.set_ylabel(ylabel+' (kpc)')
+    ax.set_aspect('equal', adjustable='box')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", 0.2, pad=0)
+    cb=plt.colorbar(sc, cax=cax)
+    cb.ax.tick_params(direction='in')
+    if field in ['particle_ind1']:
+        cb.ax.invert_yaxis()
+    cb.set_label(cblabel)
+    if 'particle_nuc' in field:
+        cb.set_ticks([7,8,9,10])
+        cb.set_ticklabels(['10 MHz', '100 MHz', '1 GHz', '10 GHz'])
+    ax.text(0.03, 0.90, '%6.2f Myr' % (float(ds.current_time)/3.15569E13),
+            horizontalalignment='left', verticalalignment='center',
+            color='grey', transform=ax.transAxes)
+    #ax.annotate(sim_name+'\n'+ptype, (1,0), xytext=(0.8, 0.96), textcoords='axes fraction',\
+    #            horizontalalignment='left', verticalalignment='center')
 
-        plt.tight_layout()
-        plt.savefig(os.path.join(absfiguredir,ptype+'_'+field.strip(),file.filename+'.png'),\
-                dpi=200, bbox_inches='tight')
-        plt.close(fig)
+    plt.tight_layout()
+    plt.savefig(os.path.join(absfiguredir,ptype+'_'+field.strip(),file.filename+'.png'),\
+            dpi=200, bbox_inches='tight')
+    plt.close(fig)
 
     return sim_name, ds.basename.rstrip('updated_peak')[-4:], field
 
