@@ -28,7 +28,9 @@ ptypes = ['jet', 'shok']
 
 #fields = ['particle_gamc_dtau', 'particle_nuc_dtau']
 fields = ['particle_shks', 'particle_gamc']
-fields +=['particle_ind1', 'particle_tau1']
+fields+= ['particle_ind1', 'particle_tau1', 'particle_den1']
+fields+= ['particle_ind2', 'particle_tau2', 'particle_den2']
+fields+= ['particle_ind3', 'particle_tau3', 'particle_den3']
 #fields += ['particle_den1']
 
 
@@ -105,22 +107,25 @@ def worker_fn(file, field, proj_axis, zoom_fac, ptype):
         fdata = np.log10(magp)
         vmin=-12; vmax=-10; cmap='arbre'
         cblabel=u'log$P_B$'
-    elif field == 'particle_den1':
-        fdata = np.log10(ad[(ptype, 'particle_den1')][filter])
+    elif field in ['particle_den%i'%i for i in [0,1,2,3]]:
+        ind = field[-1]
+        fdata = np.log10(ad[(ptype, field)][filter])
         vmin=-27; vmax=-25; cmap='arbre'
-        cblabel=u'density when leaving jet $\\rho_1$ (g/cm$^3$)'
+        cblabel=u'density%s $\\rho_1$ (g/cm$^3$)' % ind
     elif field == 'particle_shks':
         fdata = ad[(ptype, 'particle_shks')][filter]
         vmin=1; vmax=8; cmap='jet'
         cblabel=u'shks compr ratio'
-    elif field == 'particle_ind1':
-        fdata = ad[(ptype, 'particle_ind1')][filter]
+    elif field in ['particle_ind%i'%i for i in [1,2,3]]:
+        ind = field[-1]
+        fdata = ad[(ptype, field)][filter]
         vmin=1; vmax=3; cmap='jet'
-        cblabel=u'power-law index'
-    elif field == 'particle_tau1':
-        fdata = np.log10(ad[(ptype, 'particle_tau1')][filter])
+        cblabel=u'power-law index %s' %ind
+    elif field in ['particle_tau%i'%i for i in [1,2,3]]:
+        ind = field[-1]
+        fdata = np.log10(ad[(ptype, field)][filter])
         vmin=-8; vmax=-4; cmap='arbre_r'
-        cblabel=r'$log \tau$'
+        cblabel=r'$log \tau_{%s}$' % ind
 
     if proj_axis == 'x':
         sort = np.argsort(ad[ptype, 'particle_position_x'][filter])
