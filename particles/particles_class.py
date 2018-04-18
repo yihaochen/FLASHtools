@@ -18,8 +18,11 @@ _fields_list = [
     'velx', 'vely', 'velz',
     'magx', 'magy', 'magz',
     'dens', 'gamc',
-    'tau',  'dtau',
-    'shok'
+    'ind1', 'tau1', 'den1',
+    'ind2', 'tau2', 'den2',
+    'ind3', 'tau3', 'den3',
+    'whch',
+    'shok', 'shks'
 ]
 
 def find_part_ind(h5file, tag, tadd):
@@ -75,7 +78,6 @@ class Particle():
         self.tadd = tadd
         self.tag = tag
         self.den0 = -1
-        self.den1 = -1
         self.time = []
         #nfiles = len(partfiles)
         self.grid_fields = grid_fields
@@ -97,11 +99,11 @@ class Particle():
             # Assign den0 and den1 for the first time and make sure den0 are the same
             if self.den0 < 0:
                 self.den0 = tp[ind, colname.index('den0')]
-                self.den1 = tp[ind, colname.index('den1')]
+                #self.den1 = tp[ind, colname.index('den1')]
             else:
             # Compare den0 and den1 otherwise
                 assert self.den0 == tp[ind, colname.index('den0')]
-                assert self.den1 == tp[ind, colname.index('den1')]
+                #assert self.den1 == tp[ind, colname.index('den1')]
 
             for field in _fields_list:
                 getattr(self, field).append( tp[ind,findices[field]] )
