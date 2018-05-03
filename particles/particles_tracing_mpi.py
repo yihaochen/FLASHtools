@@ -27,8 +27,8 @@ dir = './'
 regex = '*_hdf5_part_????'
 
 # Index of the file in which random particles will be selected
-rand_findex = 400
-nparticles = 100
+rand_findex = 500
+nparticles = 200
 
 tags = None
 tadds = None
