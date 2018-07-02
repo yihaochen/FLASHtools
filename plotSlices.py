@@ -5,6 +5,7 @@ from yt.fields.field_detector import FieldDetector
 #yt.enable_parallelism()
 from tools import calcNozzleCoords
 from collections import defaultdict
+from yt_cluster_ratio_fields import *
 
 mu = 1.67E-24
 k = 1.38E-16
@@ -16,7 +17,7 @@ kpc = yt.units.kpc.in_units("cm")
 
 fieldunit = {'radial_velocity': 'km/s'}
 
-extrema = { 'density': (1.0E-6*mu, 3.0E-3*mu), 'pressure':(1.0E-12, 1.0E-8),\
+extrema = { 'density': (1.0E-7*mu, 3.0E-4*mu), 'pressure':(1.0E-13, 1.0E-9),\
             'temperature': (1E0*T, 1E3*T), 'entropy': (20, 200),\
             'temperature_ratio': (0.5, 2), 'entropy_ratio': (0.5, 2),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
@@ -25,7 +26,7 @@ extrema = { 'density': (1.0E-6*mu, 3.0E-3*mu), 'pressure':(1.0E-12, 1.0E-8),\
             'velocity_magnitude':(1.0E3, 1.0E7),'radial_velocity':(-1E3, 1E3),\
             'velocity_para':(-v,v), 'velocity_perp':(-0.05*v, 0.05*v), 'mach':(0.0, 30.0),\
             'plasma_beta':(1E-1, 1E3),\
-            'shok': (0.0, 10.0),\
+            'shok': (0.0, 1.0),\
             'ism ': (0.0, 1.0), 'jet ': (1E-5, 1E0), 'magnetic_pressure': (1.0E-4*mag*mag, 1.0E-1*mag*mag),\
             'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
             'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
@@ -62,58 +63,12 @@ fields_ = ['density', 'pressure', 'temperature', 'velocity_y', 'velocity_z', 'je
 
 axis = {'x': 0, 'y':1, 'z':2}
 
-def _temperature_ratio(field, data):
-    from yt.units import cm, Kelvin
-    Tout    = data.ds.parameters['sim_tout']*Kelvin
-    Tcore   = data.ds.parameters['sim_tcore']*Kelvin
-    rCoreT  = data.ds.parameters['sim_rcoret']*cm
-
-    if not isinstance(data, FieldDetector):
-        data.set_field_parameter('center', (0,0,0))
-    r = data['index', 'spherical_radius']
-    T0 = Tout*(1.0+(r/rCoreT)**3)/(Tout/Tcore+(r/rCoreT)**3)
-
-    return data['temperature']/T0
-
-
-def _entropy_ratio(field, data):
-    from yt.units import g, cm, Kelvin
-    mH = yt.utilities.physical_constants.mass_hydrogen
-    k  = yt.utilities.physical_constants.boltzmann_constant
-
-    rhoCore = data.ds.parameters['sim_rhocore']*g/cm**3
-    rCore   = data.ds.parameters['sim_rcore']*cm
-    densitybeta = data.ds.parameters['sim_densitybeta']
-    Tout    = data.ds.parameters['sim_tout']*Kelvin
-    Tcore   = data.ds.parameters['sim_tcore']*Kelvin
-    rCoreT  = data.ds.parameters['sim_rcoret']*cm
-    gammaICM= data.ds.parameters['sim_gammaicm']
-    mu      = data.ds.parameters['sim_mu']
-
-    if not isinstance(data, FieldDetector):
-        data.set_field_parameter('center', (0,0,0))
-    r = data['index', 'spherical_radius']
-    mw = data.get_field_parameter("mu")
-    if mw is None: mw = 1.0
-    mw *= mH
-    density0 = rhoCore*(1.0 + (r/rCore)**2)**(-1.5*densitybeta)
-    T0 = Tout*(1.0+(r/rCoreT)**3)/(Tout/Tcore+(r/rCoreT)**3)
-
-    icm_entropy = k*T0*(density0/mw)**(-2./3.)
-
-    return data['entropy'].in_units('keV*cm**2')/icm_entropy.in_units('keV*cm**2')
 
 def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
                 zoom_fac=1, nozzleCoords=None, plotgrid=True, plotvelocity=False,\
                 markcenter=False, savepath=None, sim_name=None, width=None,\
                 show=False, annotate_particles=None, annotate_part_info=None,\
                 buff_size=(400,800)):
-    if field == 'entropy_ratio':
-        ds.add_field('entropy_ratio', function=_entropy_ratio,
-                display_name='Entropy Ratio', sampling_type='cell')
-    if field == 'temperature_ratio':
-        ds.add_field('temperature_ratio', function=_temperature_ratio,
-                display_name='Temperature Ratio', sampling_type='cell')
 
     plot = yt.SlicePlot(ds, proj_axis, field, center=center, width=width)
     if plotvelocity:
@@ -152,7 +107,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     mi, ma = extrema[field]
     plot.set_zlim(field, mi, ma)
     plot.zoom(zoom_fac)
-    plot.annotate_timestamp(corner='upper_left', time_format="{time:6.3f} {units}",
+    plot.annotate_timestamp(corner='upper_left', time_format="{time:6.1f} {units}",
                             time_unit='Myr', draw_inset_box=True)
     if sim_name:
         plot.annotate_text((0.85, 0.90), sim_name, coord_system='axis',
