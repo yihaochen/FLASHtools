@@ -71,3 +71,7 @@ Jiggle/jiggle_patterns/
 
 # Testing scripts
 sandbox/
+
+# Figures
+*.png
+*.pdf
