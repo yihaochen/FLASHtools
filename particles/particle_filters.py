@@ -29,10 +29,10 @@ def jet(pfilter, data):
 @yt.particle_filter(name='shok', requires=["particle_shok"], filtered_type="io")
 def shok(pfilter, data):
     shok = np.isclose(data[(pfilter.filtered_type, "particle_shok")], 1.0)
-    gamc = np.logical_and((data[(pfilter.filtered_type, "particle_gamc")] > 0.0),\
-                          (data[(pfilter.filtered_type, "particle_gamc")] < 1E40))
-    fil = np.logical_and(shok, gamc)
-    return fil
+    #gamc = np.logical_and((data[(pfilter.filtered_type, "particle_gamc")] > 0.0),\
+    #                      (data[(pfilter.filtered_type, "particle_gamc")] < 1E40))
+    #fil = np.logical_and(shok, gamc)
+    return shok
 
 
 # Lobe particles that include both particles injected at the core and the sheth
