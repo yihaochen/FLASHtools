@@ -18,11 +18,14 @@ _fields_list = [
     'velx', 'vely', 'velz',
     'magx', 'magy', 'magz',
     'dens', 'gamc',
-    'ind1', 'tau1', 'den1',
-    'ind2', 'tau2', 'den2',
-    'ind3', 'tau3', 'den3',
-    'whch',
-    'shok', 'shks'
+#    'den1', 'dtau',
+    'shok',
+    'tau0', 'cmb0', 'ict0',
+    'ind1', 'tau1', 'den1', 'cmb1', 'ict1', 'tad1',
+    'ind2', 'tau2', 'den2', 'cmb2', 'ict2', 'tad2',
+    'ind3', 'tau3', 'den3', 'cmb3', 'ict3', 'tad3',
+    'ind4', 'tau4', 'den4', 'cmb4', 'ict4', 'tad4',
+    'whch', 'shks', 'jet'
 ]
 
 def find_part_ind(h5file, tag, tadd):
@@ -91,7 +94,12 @@ class Particle():
 
     def read_from_h5file(self, ind, h5file, ds=None):
         colname = [item[0].decode().strip() for item in h5file['particle names']]
-        findices = {f: colname.index(f) for f in _fields_list}
+        try:
+            findices = {f: colname.index(f) for f in _fields_list}
+        except ValueError as err:
+            print(err, colname)
+            raise ValueError
+
         # If the supplied particle is found in this particle file
         if ind:
             self.time.append( h5file['real scalars'].value[0][1]/Myr )

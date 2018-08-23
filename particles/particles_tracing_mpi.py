@@ -24,10 +24,11 @@ Myr= yt.units.Myr.in_units('s').v
 kpc= yt.units.kpc.in_units('cm').v
 
 dir = './'
+#regex = '*_hdf5_part_????_updated_peak'
 regex = '*_hdf5_part_????'
 
 # Index of the file in which random particles will be selected
-rand_findex = 500
+rand_findex = 100
 nparticles = 200
 
 tags = None
@@ -37,7 +38,7 @@ tadds = None
 grid_fields = []
 
 def rescan(dir, printlist=False):
-    files = util.scan_files(dir, regex=regex, walk=True)
+    files = util.scan_files(dir, regex=regex, walk=True, printlist=printlist)
     return files
 
 
@@ -49,10 +50,13 @@ if MPI_taskpull2.rank == 0:
     tp = h5file['tracer particles']
     print('Choosing random particles in %s' % partfiles[rand_findex].filename)
 
+    colname = [item[0].decode().strip() for item in h5file['particle names']]
+
+    mask = tp[:,colname.index('type')] == 1.0
+    tp = tp[mask,:]
     # Pick nparticles
     rints = sorted(random.sample(range(tp.shape[0]), nparticles))
 
-    colname = [item[0].decode().strip() for item in h5file['particle names']]
     findices = {f: colname.index(f) for f in ['tag', 'tadd', 'shok']}
 
     tags =  tp[rints,colname.index('tag')]
@@ -78,7 +82,7 @@ def tasks_gen():
         yield file.fullpath
 
 
-picklename = "Particles_tracing.pickle"
+picklename = "particles_tracing.pickle"
 if not os.path.exists(picklename):
     tasks = tasks_gen()
     results = MPI_taskpull2.taskpull(worker_fn, tasks, initialize=init)
@@ -121,22 +125,23 @@ def plot_particle_tracing(part, timerange='alltime'):
     #################### Density ################
     #rho_norm = 10**int(np.log10(max(part.dens)))
     #rho_norm = max(part.dens)/10
-    rho_norm = 1E-28
+    rho_norm = max(int(part.dens.max()/1E-29/10), 1)*1E-29
     plt.fill_between(part.time, part.dens/rho_norm, lw=0, color='skyblue', alpha=0.7,
                      label=u'density/(%.0eg/cm$^3$)' % rho_norm)
-    plt.fill_between(part.time, part.den1/rho_norm, lw=0, color='skyblue', alpha=0.5)
+    #plt.fill_between(part.time, part.den1/rho_norm, lw=0, color='skyblue', alpha=0.5)
 
     #################### Velocity ################
     v_mag = np.sqrt(part.velx**2+part.vely**2+part.velz**2)
-    v_norm = 6E8
+    v_norm = max(int(v_mag.max()/3E8/10), 1)*3E8
     #plt.plot(part.time, v_mag/v_norm, '--', c='r', alpha=0.5, label='v/%.0e cm/s' % v_norm)
     plt.fill_between(part.time, v_mag/v_norm, color='r', lw=0, alpha=0.3, label=u'$|v| & v_z $/(%.0ecm/s)' % v_norm)
     plt.fill_between(part.time, np.abs(part.velz)/v_norm, color='r', lw=0, alpha=0.2)
-    try:
-        arg = np.where(v_mag<v_thres)[0][0]
-        plt.axvline(part.time[arg], color='r', lw=1, alpha=0.3)
-    except:
-        pass
+
+    #try:
+    #    arg = np.where(v_mag<v_thres)[0][0]
+    #    plt.axvline(part.time[arg], color='r', lw=1, alpha=0.3)
+    #except:
+    #    pass
     #plt.hlines(v_thres/v_norm, part.time[0], part.time[-1], color='r', lw=1, alpha=0.3)
 
     #plt.twiny()
@@ -144,41 +149,59 @@ def plot_particle_tracing(part, timerange='alltime'):
     #################### Magnetic Field ################
     B_mag = np.sqrt(part.magx**2+part.magy**2+part.magz**2)
     #B_norm = max(B_mag)/10
-    B_norm = 1E-6
+    B_norm = max(int(B_mag.max()/1E-6/10), 1)*1E-6
     plt.plot(part.time, B_mag/B_norm, '-', c='b', lw=0.8, alpha=0.5, label=u'B/(%.0f$\mu$G)' % (B_norm*1E6))
 
     #################### SHKS ################
-    plt.plot(part.time, part.shks, '.-', ms=3, c='k', alpha=0.8, label=u'shks')
-    plt.plot(part.time, part.whch, 'x', ms=3, c='k', alpha=0.8, label=u'whch')
+    if 'shks' in part.__dict__:
+        plt.plot(part.time, part.shks, '.-', ms=3, c='k', alpha=0.8, label=u'shks')
+        plt.plot(part.time, part.whch, 'x', ms=3, c='k', alpha=0.8, label=u'whch')
 
     #################### TAU ################
-    if part.tau1.size:
+    if 'tau1' in part.__dict__:
         tau_norm = max(part.tau1)/10
-        plt.plot(part.time, part.tau1/tau_norm, '-',  c='g', label='tau1/%.0e' % (tau_norm), alpha=0.3)
-        plt.plot(part.time, part.tau2/tau_norm, '--', c='g', label='tau2/%.0e' % (tau_norm), alpha=0.3)
-        plt.plot(part.time, part.tau3/tau_norm, ':',  c='g', label='tau3/%.0e' % (tau_norm), alpha=0.3)
-        #plt.plot(part.time, part.dtau/tau_norm, '--', c='g', label='dtau/%.0e' % (tau_norm))
+        ict_norm = max(part.cmb0)/10
+        tau_norm = max(tau_norm, ict_norm)
+        ict_norm = max(tau_norm, ict_norm)
+        plt.plot(part.time, part.tau0/tau_norm, '-',  lw=1 , c='darkgreen', label='tau0/%.0e' % (tau_norm), alpha=0.5)
+        plt.plot(part.time, part.cmb0/ict_norm, '--', lw=1 , c='darkgreen', label='cmb0/%.0e' % (ict_norm), alpha=0.5)
+        plt.plot(part.time, part.ict0/ict_norm, ':',  lw=1 , c='darkgreen', label='ict0/%.0e' % (ict_norm), alpha=0.3)
 
-        #################### IND ################
-        plt.plot(part.time, part.ind1, '-',  c='purple', label='ind1', alpha=0.3)
-        plt.plot(part.time, part.ind2, '--', c='purple', label='ind2', alpha=0.3)
-        plt.plot(part.time, part.ind3, ':',  c='purple', label='ind3', alpha=0.3)
+        plt.plot(part.time, part.tau1/tau_norm, '-',  lw=3 , c='g', label='tau1/%.0e' % (tau_norm), alpha=0.5)
+        plt.plot(part.time, part.cmb1/ict_norm, '--', lw=3 , c='g', label='cmb1/%.0e' % (ict_norm), alpha=0.5)
+        plt.plot(part.time, part.ict1/ict_norm, ':',  lw=3 , c='g', label='ict1/%.0e' % (ict_norm), alpha=0.3)
+
+        plt.plot(part.time, part.tau2/tau_norm, '-',  lw=2 , c='lime', label='tau2/%.0e' % (tau_norm), alpha=0.5)
+        plt.plot(part.time, part.tau3/tau_norm, '-',  lw=1 , c='lime', label='tau3/%.0e' % (tau_norm), alpha=0.5)
+    #################### IND ################
+        #plt.plot(part.time, part.ind1, '-',  c='purple', label='ind1', alpha=0.3)
+        #plt.plot(part.time, part.ind2, '--', c='purple', label='ind2', alpha=0.3)
+        #plt.plot(part.time, part.ind3, ':',  c='purple', label='ind3', alpha=0.3)
+
+    elif 'dtau' in part.__dict__:
+        tau_norm = max(part.dtau)/10
+        plt.plot(part.time, part.dtau/tau_norm, '--', c='g', label='dtau/%.0e' % (tau_norm))
+
 
     #plt.hlines(0.00056966283093648636/tau_norm, part.time[0], part.time[-1], color='g', lw=0.5)
     #ind = np.argwhere(np.isclose(part.tau, 0.00056966283093648636))
     #plt.vlines(part.time[ind], 0, 12, color='g', lw=0.5)
 
     #################### Cutoff Gamma ################
-    plt.plot(part.time, np.log10(part.gamc), '-.', c='c', label=u'log $\\gamma_{c}$', alpha=0.3)
-    #gamc_dtau = (part.dens/part.den0)**(1./3.)/part.dtau
-    #plt.plot(part.time, np.log10(gamc_dtau), '-', c='c', label=u'log $\\gamma_{c}$ (dtau)')
+    #if 'dtau' in part.__dict__:
+    #    gamc_dtau = (part.dens/part.den0)**(1./3.)/part.dtau
+    #    plt.plot(part.time, np.log10(gamc_dtau), '-', c='gold', label=u'log $\\gamma_{c}$ (dtau)')
+    #else:
+    #    plt.plot(part.time, np.log10(part.gamc), '-.', c='gold', label=u'log $\\gamma_{c}$', alpha=0.3)
 
 
     #################### Cutoff frequency ################
-    nuc = 3.0*part.gamc**2*e*B_mag/(4.0*np.pi*me*c)
-    #nuc_dtau = 3.0*gamc_dtau**2*e*B_mag/(4.0*np.pi*me*c)
-    plt.plot(part.time, np.log10(nuc), ':', c='gold', label=u'log $\\nu_{c}$/Hz', alpha=0.3)
-    #plt.plot(part.time, np.log10(nuc_dtau), '-', c='gold', label=u'log $\\nu_{c}$/Hz (dtau)')
+    if 'dtau' in part.__dict__:
+        nuc_dtau = 3.0*gamc_dtau**2*e*B_mag/(4.0*np.pi*me*c)
+        plt.plot(part.time, np.log10(nuc_dtau), '-', c='cyan', label=u'log $\\nu_{c}$/Hz (dtau)')
+    else:
+        nuc = 3.0*part.gamc**2*e*B_mag/(4.0*np.pi*me*c)
+        plt.plot(part.time, np.log10(nuc), ':', c='cyan', label=u'log $\\nu_{c}$/Hz', alpha=0.3)
 
     #################### Cylindrical Radius ################
     #r_nozzle = 7.5E20
@@ -208,7 +231,7 @@ def plot_particle_tracing(part, timerange='alltime'):
 
     #coreden0 = calcDen0_2015(part.tadd)
     #plt.plot(part.time[0], coreden0/rho_norm, '+', c='skyblue', ms=5)
-    if part.shok[0] == 1:
+    if 'shok' in part.__dict__ and part.shok[0] == 1:
         plt.text(0.05, 0.82, 'shok', transform=plt.axes().transAxes)
     #elif part.den0 < coreden0 - deltaden0 or part.den0 > coreden0 + deltaden0:
     #    plt.text(0.05, 0.82, r'$\rho_0$=%.3e, $\rho_{0,core}=$%.3e' % (part.den0, coreden0), transform=plt.axes().transAxes)
