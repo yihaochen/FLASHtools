@@ -25,7 +25,7 @@ class Logfile():
 
     def parse_lines(self, loglines):
         # Regular expressions for retrieving # of blocks
-        leafblk_re = ' \[GRID amr_refine_derefine\] min leaf blks (\d+)[ ]*?max leaf blks (\d+)[ ]*?tot leaf blks (\d+)'
+        leafblk_re = ' \[GRID amr_refine_derefine\] min leaf blks (\d+)[ ]*?max leaf blks (\d+)[ ]*?tot leaf blks[ ]*(\d+)'
         blk_re = ' \[GRID amr_refine_derefine\] min blks (\d+)[ ]*?max blks (\d+)[ ]*?tot blks (\d+)'
         step_re = ' \[ (.*) \] step: n=(\d+) t=(.+) dt=(.+)'
 

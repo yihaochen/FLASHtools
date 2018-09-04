@@ -11,24 +11,14 @@ import logging
 logging.getLogger('yt').setLevel(logging.ERROR)
 
 # Scan for files
-#dirs = ['/home/ychen/data/0only_0330_h0_nojiggle',\
-#        '/home/ychen/data/0only_0518_hydro_nojiggle',\
-#        '/home/ychen/data/0only_0314_h1_nojiggle',\
-#        '/home/ychen/data/0only_0525_hinf_nojiggle']
-#dirs = ['/home/ychen/data/0only_1106_M3_h1',\
-#        '/home/ychen/data/0only_1204_M24_b01',\
-#        '/home/ychen/data/0only_1110_h0_rerun']
-#dirs = ['/home/ychen/data/0only_0529_h1/',\
-#        '/home/ychen/data/0only_0605_h0/',\
-#        '/home/ychen/data/0only_0605_hinf/',\
-#        '/home/ychen/data/0only_0602_hydro/']
+dirs = ['/d/d9/ychen/2018_production_runs/20180801_L430_rc10_beta07/',\
+        '/d/d9/ychen/2018_production_runs/20180802_L438_rc10_beta07/',\
+        '/d/d9/ychen/2018_production_runs/20180803_L446_rc10_beta07/',\
+        '/d/d9/ychen/2018_production_runs/20180824_L438_rc30_beta07/']
 
-dirs = ['/home/ychen/data/0only_1022_h1_10Myr/',\
-        '/home/ychen/data/0only_1212_h0_10Myr_rerun/']
-#        '/home/ychen/data/0only_0204_hinf_10Myr/',\
-#        '/home/ychen/data/0only_0413_hydro_10Myr/']
+regex = '*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
 
-regex = 'MHD_Jet*_hdf5_plt_cnt_[0-9][0-9][0-9][0-9]'
+zoom_fac = 4
 
 def rescan(dir, printlist=False):
     files = util.scan_files(dir, regex=regex, walk=True, reverse=False)
@@ -40,12 +30,13 @@ def worker_fn(dirname, filepath):
     #zlim = (ds.domain_left_edge[2]/factor, ds.domain_right_edge[2]/factor)
     #rlim = (0.0, ds.domain_right_edge[0]/factor)
 
-    dx = ds.index.get_smallest_dx().in_units('cm')
+    dx = ds.index.get_smallest_dx().v
     # Assuming the jet is propagating at velocity slower than 15 kpc/Myr
-    zlim = max((15*ds.current_time.in_units('Myr').v*kpc)//dx, 100)*dx
+    #zlim = max((15*ds.current_time.in_units('Myr').v*kpc)//dx, 100)*dx
+    zlim = ds.domain_width[2].v/zoom_fac/2.0
     zlims = (-zlim, zlim)
     n_bins = int(2*zlim//dx)
-    rlim = (0.0, ds.domain_right_edge[0]/8.0)
+    rlim = (0.0, ds.domain_width[0]/zoom_fac/2.0)
 
     ad = ds.all_data()
     prof = yt.create_profile(ad, 'z', ['jet '], logs={'z': False}, n_bins=n_bins, \
@@ -61,13 +52,13 @@ def worker_fn(dirname, filepath):
             zmin = z
             break
 
-
-
     kpc = yt.units.kpc.in_units('cm')
 
+    xlim = ds.domain_width[0]/zoom_fac/2.0
+    ylim = ds.domain_width[1]/zoom_fac/2.0
     # Upper half of the simulation domain
-    leftedge = [-30*kpc, -30*kpc, 0.0]
-    rightedge = [ 30*kpc, 30*kpc, zmax.in_units('cm')*1.2]
+    leftedge =  [-xlim, -ylim, 0.0]
+    rightedge = [ xlim,  ylim, zmax.in_units('cm')*1.2]
     upbox = ds.box(leftedge, rightedge)
     upcenter = np.sum(upbox['jet ']*upbox['cell_mass']*upbox['z'])/np.sum(upbox['jet ']*upbox['cell_mass'])
 
