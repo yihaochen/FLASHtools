@@ -87,28 +87,38 @@ def worker_fn(dirname, filepath):
     return int(ds.basename[-4:]), ds.current_time.in_units('Myr'), zmax.in_units('kpc'), zmin.in_units('kpc'), \
            upcenter.in_units('kpc'), bottomcenter.in_units('kpc'), rmax_up.in_units('kpc'), rmax_low.in_units('kpc')
 
+collected = {}
+
 def tasks_gen(dirs):
+    analyzed_fnumbers = {}
+    for dir in dirs:
+        try:
+            table = np.loadtxt(dir+'/GridAnalysis_LobeSize.txt')
+            collected[dir] = list(table)
+            analyzed_fnumbers[dir] = np.array(table[:,0], dtype=int)
+        except:
+            analyzed_fnumbers[dir] = []
     for dir in dirs:
         files = rescan(dir)
         for file in reversed(files[:]):
-            yield file.pathname, file.fullpath
+            if int(file.filename[-4:]) not in analyzed_fnumbers[dir]:
+                yield file.pathname, file.fullpath
 
 tasks = tasks_gen(dirs)
 
 results = MPI_taskpull2.taskpull(worker_fn, tasks, print_result=True)
 
 if results:
-    collected = {}
     for key, item in results.items():
         dirname, fname = key
         if dirname.split('/')[-1] == 'data':
             dirname = op.dirname(dirname) + '/'
         if dirname in collected:
-            collected[dirname].append(item)
+            collected[dirname].append(np.array(item))
         else:
             collected[dirname] = [item]
     for key, item in collected.items():
-        collected[key] = sorted(item)
+        collected[key] = sorted(item, key=lambda arr: arr[0])
     #print collected
 
     #picklename = time.strftime("Bflux_table_%Y%m%d_%H%M%S.pickle")
