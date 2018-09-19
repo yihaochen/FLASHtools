@@ -6,8 +6,9 @@ from yt.fields.field_detector import FieldDetector
 from tools import calcNozzleCoords
 from collections import defaultdict
 from yt_cluster_ratio_fields import *
+from particles.particle_filters import *
 
-mu = 1.67E-24
+mh = 1.67E-24
 k = 1.38E-16
 T = 1.0E7
 v = 0.2*3.0E10
@@ -17,7 +18,7 @@ kpc = yt.units.kpc.in_units("cm")
 
 fieldunit = {'radial_velocity': 'km/s'}
 
-extrema = { 'density': (1.0E-7*mu, 3.0E-4*mu), 'pressure':(1.0E-13, 1.0E-9),\
+extrema = { 'density': (5.0E-6*mh, 3.0E-3*mh), 'pressure':(1.0E-13, 1.0E-9),\
             'temperature': (1E0*T, 1E3*T), 'entropy': (20, 200),\
             'temperature_ratio': (0.5, 2), 'entropy_ratio': (0.5, 2),\
             'magnetic_field_x': (-mag, mag), 'magnetic_field_y': (-mag, mag), 'magnetic_field_z':(-mag,mag),\
@@ -28,7 +29,7 @@ extrema = { 'density': (1.0E-7*mu, 3.0E-4*mu), 'pressure':(1.0E-13, 1.0E-9),\
             'plasma_beta':(1E-1, 1E3),\
             'shok': (0.0, 1.0),\
             'ism ': (0.0, 1.0), 'jet ': (1E-5, 1E0), 'magnetic_pressure': (1.0E-4*mag*mag, 1.0E-1*mag*mag),\
-            'dens': (1.0E-5*mu, 1.0E1*mu), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
+            'dens': (1.0E-5*mh, 1.0E1*mh), 'pres':(1.0E-5*k*T, 1.0E0*k*T),'temp': (10.0*T, 1.0E4*T),\
             'magx': (-mag, mag), 'magy': (-mag, mag), 'magz':(-mag,mag),\
             'velx': (-v,v), 'vely': (-v,v), 'velz':(-v,v),\
             'magp': (1E-20, 1.0E-7), 'eint': (1.0E15, 1.0E18),\
@@ -107,7 +108,7 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     mi, ma = extrema[field]
     plot.set_zlim(field, mi, ma)
     plot.zoom(zoom_fac)
-    plot.annotate_timestamp(corner='upper_left', time_format="{time:6.1f} {units}",
+    plot.annotate_timestamp(corner='upper_left', time_format="{time:6.2f} {units}",
                             time_unit='Myr', draw_inset_box=True)
     if sim_name:
         plot.annotate_text((0.85, 0.90), sim_name, coord_system='axis',
@@ -115,10 +116,14 @@ def plotSliceField(ds, proj_axis='x', field='density', center=(0.0,0.0,0.0),\
     if annotate_particles:
         try:
             #slab_width = ds.domain_width.value[axis[proj_axis]] - 2.0*center[axis[proj_axis]]
-            slab_width = 1.0*kpc
+            for ptype in ['jet', 'shok', 'metal']:
+                ds.add_particle_filter(ptype)
+            slab_width = ds.index.get_smallest_dx()*2
             if type(annotate_particles) is list:
                 if field in annotate_particles:
-                    plot.annotate_particles(slab_width)
+                    plot.annotate_particles(slab_width, col='grey', ptype='jet')
+                    plot.annotate_particles(slab_width, col='orange', ptype='shok')
+                    plot.annotate_particles(slab_width, col='g', ptype='metal')
             else:
                 plot.annotate_particles(slab_width)
         except:
