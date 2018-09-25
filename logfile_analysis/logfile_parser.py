@@ -10,7 +10,8 @@ class Logfile():
         self.__dict__ = defaultdict(list)
         self.sim_dict = defaultdict(list)
         self.fname = fname
-        self.last_modified = None
+        self.last_updated = None
+        self.last_parsed = None
         self.dirname = fname.split('/')[-2]
 
     def append_sim_dict(self, startmark, endmark, startdtime, enddtime, nProc):
@@ -87,10 +88,12 @@ class Logfile():
         self.append_sim_dict(startmark, step, startdtime, dtime, nProc)
 
     def parse_logfile(self):
-        print('Parsing ', self.fname)
         begin = datetime.now()
         # Last modified time of the logfile
         self.last_updated = datetime.fromtimestamp(os.path.getmtime(self.fname))
+        if self.last_parsed and self.last_parsed > self.last_updated:
+            return
+        print('Parsing ', self.fname)
         with open(self.fname, 'r') as f:
             self.parse_lines(f.readlines())
         # Convert lists to numpy arrays
@@ -102,6 +105,7 @@ class Logfile():
             self.__dict__[k] = np.array(v)
 
         self.step_time = self.calculate_step_time()
+        self.last_parsed = datetime.now()
 
         print('Parsed %6i steps (last n=%6i) in %.2f s' %
               (len(self.step), self.step[-1], (datetime.now()-begin).total_seconds()))
