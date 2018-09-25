@@ -212,4 +212,20 @@ def setup_cl(dirs):
         elif 'M24_b01' in dirname:
             colors[dirname] = 'purple'
             labels[dirname] = 'low beta (0.01)'
+        # For 2018 Simulations
+        if 'L430' in dirname:
+            labels[dirname] = 'low power'
+            colors[dirname] = 'C0'
+        elif 'L438' in dirname:
+            labels[dirname] = 'mid power'
+            colors[dirname] = 'C1'
+        elif 'L446' in dirname:
+            labels[dirname] = 'high power'
+            colors[dirname] = 'C2'
+        if 'rc10' in dirname:
+            labels[dirname] += ' - 10kpc-core'
+        elif 'rc30' in dirname:
+            labels[dirname] += ' - 30kpc-core'
+
+
     return colors, labels
