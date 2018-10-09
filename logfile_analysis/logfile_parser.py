@@ -43,8 +43,9 @@ class Logfile():
                 # append the current line to the lines_buf of previous line
                 lines_buf += line.lstrip()
                 ma = re.match(leafblk_re, lines_buf)
-                step_dict['min_leaf_blks'], step_dict['max_leaf_blks'], step_dict['tot_leaf_blks'] = \
-                    tuple(map(int, ma.groups()))
+                if ma:
+                    step_dict['min_leaf_blks'], step_dict['max_leaf_blks'], step_dict['tot_leaf_blks'] = \
+                        tuple(map(int, ma.groups()))
                 continuation = False
             elif 'FLASH log file:' in line:
                 # After at least one simulation
@@ -93,6 +94,12 @@ class Logfile():
         self.last_updated = datetime.fromtimestamp(os.path.getmtime(self.fname))
         if self.last_parsed and self.last_parsed > self.last_updated:
             return
+
+        for k, v in self.__dict__.copy().items():
+            if type(v) is np.ndarray:
+                del self.__dict__[k]
+        self.sim_dict = defaultdict(list)
+
         print('Parsing ', self.fname)
         with open(self.fname, 'r') as f:
             self.parse_lines(f.readlines())
