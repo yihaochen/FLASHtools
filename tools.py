@@ -191,6 +191,8 @@ def calcDen0(data, ptype='io'):
 
 def setup_cl(dirs):
     # Set up colors and label names
+    if dirs is not list:
+        dirs = [dirs]
     colors = {}
     labels = {}
     for dirname in dirs:
@@ -198,13 +200,16 @@ def setup_cl(dirs):
             colors[dirname] = 'pink'
             labels[dirname] = 'low Mach (3)'
         elif 'h1' in dirname:
-            colors[dirname] = 'r'   #'#fc8d62'
+            #colors[dirname] = 'r'   #'#fc8d62'
+            colors[dirname] = '#ff7f0e'
             labels[dirname] = 'helical'
         elif 'h0' in dirname:
-            colors[dirname] = 'b'   #'#8da0cb'
+            #colors[dirname] = 'b'   #'#8da0cb'
+            colors[dirname] = '#1f77b4'
             labels[dirname] = 'poloidal'
         elif 'hinf' in dirname:
-            colors[dirname] = 'g'   #'#66c2a5'
+            #colors[dirname] = 'g'   #'#66c2a5'
+            colors[dirname] = '#2ca02c'
             labels[dirname] = 'toroidal'
         elif 'hydro' in dirname:
             colors[dirname] = 'k'
@@ -222,10 +227,11 @@ def setup_cl(dirs):
         elif 'L446' in dirname:
             labels[dirname] = 'high power'
             colors[dirname] = 'C2'
-        if 'rc10' in dirname:
+        if 'rc100' in dirname:
+            labels[dirname] += ' - 100kpc-core'
+        elif 'rc10' in dirname:
             labels[dirname] += ' - 10kpc-core'
         elif 'rc30' in dirname:
             labels[dirname] += ' - 30kpc-core'
-
 
     return colors, labels

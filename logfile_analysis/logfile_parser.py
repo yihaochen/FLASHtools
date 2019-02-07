@@ -60,13 +60,21 @@ class Logfile():
                 step_dict['nProc'] = nProc
             elif '[GRID amr_refine_derefine] min blks' in line:
                 ma = re.match(blk_re, line)
-                step_dict['min_blks'], step_dict['max_blks'], step_dict['tot_blks'] = tuple(map(int, ma.groups()))
+                try:
+                    step_dict['min_blks'], step_dict['max_blks'], step_dict['tot_blks'] = tuple(map(int, ma.groups()))
+                except:
+                    print(ma)
+                    print(line)
             elif '[GRID amr_refine_derefine] min leaf blks' in line:
                 lines_buf = line.strip('\n')
                 continuation = True
             elif 'step: n=' in line:
                 ma = re.match(step_re, line)
-                strtime, step, t, dt = ma.groups()
+                try:
+                    strtime, step, t, dt = ma.groups()
+                except:
+                    print(ma)
+                    print(line)
                 dtime = datetime.strptime(strtime, '%m-%d-%Y  %H:%M:%S.%f')
                 step_dict['step'] = int(step)
                 step_dict['t'] = float(t)
