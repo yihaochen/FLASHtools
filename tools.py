@@ -192,7 +192,7 @@ def calcDen0(data, ptype='io'):
 def setup_cl(dirs):
     # Set up colors and label names
     if type(dirs) is not list:
-        dirs = [dirs]
+        dirs = list(dirs)
     colors = {}
     labels = {}
     for dirname in dirs:
