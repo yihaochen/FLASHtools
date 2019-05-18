@@ -6,11 +6,11 @@ import os
 
 timelimit = int(sys.argv[1]) if len(sys.argv) > 1 else 48*60*60
 
-plotfiles = glob.glob('./*_hdf5_plt_cnt_????')
-partfiles = glob.glob('./*_hdf5_part_????')
-chkfiles = glob.glob('./*_hdf5_chk_????')
+plotfiles = glob.glob('./*_hdf5_plt_cnt_????') + glob.glob('./data/*_hdf5_plt_cnt_????')
+partfiles = glob.glob('./*_hdf5_part_????') + glob.glob('./data/*_hdf5_part_????')
+chkfiles = glob.glob('./*_hdf5_chk_????') + glob.glob('./data/*_hdf5_chk_????')
 
-if len(chkfiles)*len(plotfiles)*len(partfiles) > 0:
+if len(chkfiles)*len(plotfiles) > 0:
     last_chkpoint_time = max([os.path.getmtime(f) for f in chkfiles])
     for f in sorted(plotfiles):
         # Don't consider plot files generated after the last checkpoint file
@@ -31,7 +31,6 @@ if len(chkfiles)*len(plotfiles)*len(partfiles) > 0:
     #assert plotFileNumber == partFileNumber
 
     restart = '.true.'
-    timelimit -= max(plotfileNumber//10*4, 60)
 else:
     print('Setting flash.par for starting from scratch')
     restart = '.false.'
@@ -39,6 +38,7 @@ else:
     partfileNumber = 0
     chkfileNumber = 0
 
+timelimit -= max(plotfileNumber//10*4, 60)
 
 with open('flash.par', 'r') as f:
     pars = f.read()
