@@ -72,21 +72,22 @@ class Logfile():
                 ma = re.match(step_re, line)
                 try:
                     strtime, step, t, dt = ma.groups()
+                    dtime = datetime.strptime(strtime, '%m-%d-%Y  %H:%M:%S.%f')
+                    step_dict['step'] = int(step)
+                    step_dict['t'] = float(t)
+                    step_dict['dt'] = float(dt)
+                    step_dict['step_dtime'] = dtime
+
+                    # Append the current step to the class dict
+                    for k, v in step_dict.items():
+                        self.__dict__[k].append(v)
+                    if start:
+                        startmark = step
+                        start = False
                 except:
                     print(ma)
                     print(line)
-                dtime = datetime.strptime(strtime, '%m-%d-%Y  %H:%M:%S.%f')
-                step_dict['step'] = int(step)
-                step_dict['t'] = float(t)
-                step_dict['dt'] = float(dt)
-                step_dict['step_dtime'] = dtime
-
-                # Append the current step to the class dict
-                for k, v in step_dict.items():
-                    self.__dict__[k].append(v)
-                if start:
-                    startmark = step
-                    start = False
+            # Get the last timestamp
             ma = re.match(' \[ (.*) \]', line)
             if ma:
                 strtime, = ma.groups()
@@ -136,3 +137,33 @@ class Logfile():
             step_time[i] = (self.step_dtime[i] - prv_time).total_seconds()
 
         return step_time
+
+    def parse_lines_hdf5_files(self):
+        # Regular expressions for retrieving # of blocks
+        io_write_re = ' \[ (.*) \] \[IO_write.+\] close: type=(.+) name=(.+)'
+        step_re = ' \[ (.*) \] step: n=(\d+) t=(.+) dt=(.+)'
+
+        get_step = False
+
+        file_dict = {'plotfile': [], 'particles': [], 'checkpoint': []}
+        to_append = {}
+        with open(self.fname, 'r') as f:
+            loglines = f.readlines()
+        for line in loglines:
+            if 'IO_write' in line and 'close' in line:
+                if 'forced' in line: continue
+                ma = re.match(io_write_re, line)
+                strtime, ftype, name = ma.groups()
+                to_append[ftype] = [strtime, name]
+                get_step = True
+
+            if get_step:
+                if 'step: n=' in line:
+                    ma = re.match(step_re, line)
+                    strtime_step, step, t, dt = ma.groups()
+                    t_Myr = '%6.2f' % (float(t)/3.15576E13)
+                    for k, v in to_append.items():
+                        file_dict[k].append(v+[int(step), t, t_Myr])
+                    get_step = False
+                    to_append = {}
+        return file_dict
